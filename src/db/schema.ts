@@ -1,5 +1,5 @@
 // Import modules
-import { AnyPgColumn, pgTable, serial, text, timestamp, integer, jsonb, vector, varchar } from "drizzle-orm/pg-core"
+import { AnyPgColumn, pgTable, text, timestamp, integer, vector, varchar /* serial, jsonb */ } from "drizzle-orm/pg-core"
 
 // Define a table for pages
 // prettier-ignore

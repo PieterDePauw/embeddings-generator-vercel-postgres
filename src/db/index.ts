@@ -1,7 +1,7 @@
 // Import modules
 import { config } from "dotenv"
 import { drizzle } from "drizzle-orm/node-postgres"
-import { Pool } from "pg"
+// import { Pool } from "pg"
 
 // Load environment variables
 config({ path: ".env.local" }) // or .env
