@@ -1,6 +1,6 @@
-name: "supabase-embeddings-generator"
+name: "vercel-embeddings-generator"
 description: "Generate embeddings from your Knowledge Base to use with Supabase Vector."
-author: "Supabase"
+author: "PieterDePauw"
 inputs:
     database-url:
         required: true
