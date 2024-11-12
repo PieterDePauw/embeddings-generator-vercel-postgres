@@ -31,9 +31,9 @@ import { pages as documents, pageSections as documentSections, type InsertPageSe
 // 	token_count: number
 // }
 
-async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { databaseUrl: string; openaiKey: string; docsRootPath: string }): Promise<void> {
+async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: { databaseUrl: string; openaiApiKey: string; docsRootPath: string }): Promise<void> {
 	// Initialize OpenAI client
-	const openaiClient = createOpenAI({ apiKey: openaiKey, compatibility: "strict" })
+	const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" })
 
 	const client = createClient({ connectionString: databaseUrl })
 	const db = drizzle(client)
@@ -125,19 +125,18 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 
 async function run(): Promise<void> {
 	try {
-		const databaseUrl = process.env.DATABASE_URL || core.getInput("database-url")
-		const openaiKey = process.env.OPENAI_API_KEY || core.getInput("openai-key")
-		const docsRootPath = core.getInput("docs-root-path") || "docs/"
+		// Get the inputs
+		const databaseUrl: string | undefined = core.getInput("database-url")
+		const openaiApiKey: string | undefined = core.getInput("openai-api-key")
+		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
 
-		if (!databaseUrl || !openaiKey) {
+		// Check if the inputs are provided
+		if (!databaseUrl || !openaiApiKey) {
 			throw new Error("DATABASE_URL and OPENAI_API_KEY must be provided.")
 		}
 
-		await generateEmbeddings({
-			databaseUrl,
-			openaiKey,
-			docsRootPath,
-		})
+		// Generate embeddings
+		await generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath })
 	} catch (error) {
 		core.setFailed(error.message)
 	}

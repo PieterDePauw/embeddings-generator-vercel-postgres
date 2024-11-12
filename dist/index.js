@@ -94573,10 +94573,10 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 // 	token_count: number
 // }
 function generateEmbeddings(_a) {
-    return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiKey, docsRootPath }) {
+    return main_awaiter(this, arguments, void 0, function* ({ databaseDbUrl, openaiApiKey, docsRootPath }) {
         // Initialize OpenAI client
-        const openaiClient = createOpenAI({ apiKey: openaiKey, compatibility: "strict" });
-        const client = createClient({ connectionString: databaseUrl });
+        const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
+        const client = createClient({ connectionString: databaseDbUrl });
         const db = drizzle(client);
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
@@ -94651,17 +94651,16 @@ function generateEmbeddings(_a) {
 function run() {
     return main_awaiter(this, void 0, void 0, function* () {
         try {
-            const databaseUrl = process.env.DATABASE_URL || core.getInput("database-url");
-            const openaiKey = process.env.OPENAI_API_KEY || core.getInput("openai-key");
+            // Get the inputs
+            const databaseDbUrl = core.getInput("postgres-database-url");
+            const openaiApiKey = core.getInput("openai-api-key");
             const docsRootPath = core.getInput("docs-root-path") || "docs/";
-            if (!databaseUrl || !openaiKey) {
+            // Check if the inputs are provided
+            if (!databaseDbUrl || !openaiApiKey) {
                 throw new Error("DATABASE_URL and OPENAI_API_KEY must be provided.");
             }
-            yield generateEmbeddings({
-                databaseUrl,
-                openaiKey,
-                docsRootPath,
-            });
+            // Generate embeddings
+            yield generateEmbeddings({ databaseDbUrl, openaiApiKey, docsRootPath });
         }
         catch (error) {
             core.setFailed(error.message);
