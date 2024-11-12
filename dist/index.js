@@ -60710,7 +60710,7 @@ function zodSchema(zodSchema2) {
 }
 
 //# sourceMappingURL=index.mjs.map
-;// CONCATENATED MODULE: ./node_modules/.pnpm/ai@3.4.33_openai@4.72.0_zod@3.23.8__react@18.3.1_sswr@2.1.0_svelte@5.1.15__svelte@5.1.15_vue@_r3q3t3pm4qmy3sy4rfb5k52ckm/node_modules/ai/dist/index.mjs
+;// CONCATENATED MODULE: ./node_modules/.pnpm/ai@3.4.33_openai@4.72.0_zod@3.23.8__react@18.3.1_sswr@2.1.0_svelte@5.1.15__svelte@5.1.15_vue@_dvqcyx7ksuqwhx2i6yjh7uuodi/node_modules/ai/dist/index.mjs
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name11 in all)
@@ -94542,6 +94542,8 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+/* eslint-disable no-console */
+/* eslint-disable object-shorthand */
 
 
 
@@ -94573,7 +94575,7 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 function generateEmbeddings(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiKey, docsRootPath }) {
         // Initialize OpenAI client
-        const openaiClient = openai(openaiKey);
+        const openaiClient = createOpenAI({ apiKey: openaiKey, compatibility: "strict" });
         const client = createClient({ connectionString: databaseUrl });
         const db = drizzle(client);
         const refreshVersion = esm_v4();
@@ -94589,20 +94591,19 @@ function generateEmbeddings(_a) {
         console.log(`Discovered ${sources.length} pages.`);
         for (const source of sources) {
             try {
-                const checksum = source.checksum;
                 const existingPage = (yield db.select().from(pages).where(eq(pages.path, source.path)).limit(1))[0];
-                let existingPageId = existingPage === null || existingPage === void 0 ? void 0 : existingPage.id;
+                // const existingPageId: string = existingPage?.id
                 const newId = esm_v4();
                 const pageData = {
                     path: source.path,
-                    checksum: checksum,
+                    checksum: source.checksum,
                     parent_id: null, // Handle parent page logic if applicable
                     meta: source.meta,
                     version: refreshVersion,
                     last_refresh: refreshDate,
                 };
                 if (existingPage) {
-                    if (existingPage.checksum === checksum) {
+                    if (existingPage.checksum === source.checksum) {
                         console.log(`No changes detected for ${source.path}`);
                         continue;
                     }
@@ -94613,19 +94614,17 @@ function generateEmbeddings(_a) {
                 }
                 else {
                     // Insert new page
-                    const newPage = (yield db
-                        .insert(pages)
-                        .values(Object.assign(Object.assign({}, pageData), { id: newId }))
-                        .returning())[0];
-                    existingPageId = newPage.id;
+                    yield db.insert(pages).values(Object.assign(Object.assign({}, pageData), { id: newId }));
+                    // const newPage: Page = (await db.insert(documents).values({ ...pageData, id: newId }).returning())[0]
+                    // existingPageId = newPage.id
                 }
                 console.log(`Processing ${source.path}`);
                 // Generate embeddings
-                const sections = source.sections;
+                const { sections } = source;
                 for (const section of sections) {
                     // Embed the content of the section
                     const { value, embedding, usage } = yield dist_embed({
-                        model: openai.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
+                        model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
                         value: section.content.replace(/\n/g, " "),
                     });
                     const insertPageData = {
@@ -94633,7 +94632,7 @@ function generateEmbeddings(_a) {
                         page_id: (existingPage === null || existingPage === void 0 ? void 0 : existingPage.id) || newId,
                         heading: section.heading,
                         slug: section.slug,
-                        content: section.content,
+                        content: section.content || value,
                         embedding: embedding,
                         token_count: usage.tokens,
                     };
