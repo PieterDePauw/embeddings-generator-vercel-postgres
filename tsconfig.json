@@ -1,0 +1,16 @@
+{
+	"compilerOptions": {
+		"target": "es2015",
+		"moduleResolution": "node",
+		"incremental": true,
+		"noImplicitAny": false,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"baseUrl": ".",
+		"paths": {
+			"~/*": ["./*"]
+		}
+	},
+	"include": ["next-env.d.ts", "*.d.ts", "**/*.d.ts", "**/*.ts", "**/*.tsx"],
+	"exclude": ["node_modules", ".deprecated"]
+}
