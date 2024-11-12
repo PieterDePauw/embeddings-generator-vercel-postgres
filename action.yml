@@ -8,11 +8,9 @@ inputs:
     database-url:
         required: true
         description: "Your Postgres database URL"
-        default: ${{ secrets.POSTGRES_URL }}
     openai-api-key:
         required: true
         description: "Your OpenAI API key"
-        default: ${{ secrets.OPENAI_API_KEY }}
     docs-root-path:
         required: true
         description: "The path to the root of your knowledge base / docs folder"
