@@ -1,13 +1,15 @@
+/* eslint-disable no-console */
+/* eslint-disable object-shorthand */
 import * as core from "@actions/core"
 import { eq, ne } from "drizzle-orm"
-import { createClient, sql } from "@vercel/postgres"
+import { createClient } from "@vercel/postgres"
 import { drizzle } from "drizzle-orm/vercel-postgres"
-import { openai } from "@ai-sdk/openai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
 import { v4 as uuidv4 } from "uuid"
 import { walk } from "./sources/util"
 import { MarkdownSource } from "./sources/markdown"
-import { pages as documents, pageSections as documentSections, type InsertPageSection, type Page } from "./db/schema"
+import { pages as documents, pageSections as documentSections, type InsertPageSection } from "./db/schema"
 
 // interface Page {
 // 	id: string
@@ -29,9 +31,9 @@ import { pages as documents, pageSections as documentSections, type InsertPageSe
 // 	token_count: number
 // }
 
-async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { databaseUrl: string; openaiKey: string; docsRootPath: string }) {
+async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { databaseUrl: string; openaiKey: string; docsRootPath: string }): Promise<void> {
 	// Initialize OpenAI client
-	const openaiClient = openai(openaiKey)
+	const openaiClient = createOpenAI({ apiKey: openaiKey, compatibility: "strict" })
 
 	const client = createClient({ connectionString: databaseUrl })
 	const db = drizzle(client)
@@ -56,15 +58,14 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 
 	for (const source of sources) {
 		try {
-			const checksum = source.checksum!
 			const existingPage = (await db.select().from(documents).where(eq(documents.path, source.path)).limit(1))[0]
-			let existingPageId: string = existingPage?.id
+			// const existingPageId: string = existingPage?.id
 
 			const newId: string = uuidv4()
 
 			const pageData = {
 				path: source.path,
-				checksum: checksum,
+				checksum: source.checksum,
 				parent_id: null, // Handle parent page logic if applicable
 				meta: source.meta,
 				version: refreshVersion,
@@ -72,7 +73,7 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 			}
 
 			if (existingPage) {
-				if (existingPage.checksum === checksum) {
+				if (existingPage.checksum === source.checksum) {
 					console.log(`No changes detected for ${source.path}`)
 					continue
 				}
@@ -82,27 +83,20 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 				await db.delete(documentSections).where(eq(documentSections.page_id, existingPage.id)).returning()
 			} else {
 				// Insert new page
-				const newPage: Page = (
-					await db
-						.insert(documents)
-						.values({
-							...pageData,
-							id: newId,
-						})
-						.returning()
-				)[0]
-				existingPageId = newPage.id
+				await db.insert(documents).values({ ...pageData, id: newId })
+				// const newPage: Page = (await db.insert(documents).values({ ...pageData, id: newId }).returning())[0]
+				// existingPageId = newPage.id
 			}
 
 			console.log(`Processing ${source.path}`)
 
 			// Generate embeddings
-			const sections = source.sections!
+			const { sections } = source
 
 			for (const section of sections) {
 				// Embed the content of the section
 				const { value, embedding, usage } = await embed({
-					model: openai.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
+					model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
 					value: section.content.replace(/\n/g, " "),
 				})
 
@@ -111,7 +105,7 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 					page_id: existingPage?.id || newId,
 					heading: section.heading,
 					slug: section.slug,
-					content: section.content,
+					content: section.content || value,
 					embedding: embedding,
 					token_count: usage.tokens,
 				}
@@ -129,7 +123,7 @@ async function generateEmbeddings({ databaseUrl, openaiKey, docsRootPath }: { da
 	console.log("Embedding generation complete.")
 }
 
-async function run() {
+async function run(): Promise<void> {
 	try {
 		const databaseUrl = process.env.DATABASE_URL || core.getInput("database-url")
 		const openaiKey = process.env.OPENAI_API_KEY || core.getInput("openai-key")
