@@ -1,11 +1,11 @@
-import { readdir, stat } from 'fs/promises'
-import { basename, dirname, join } from 'path'
+import { readdir, stat } from "fs/promises"
+import { basename, dirname, join } from "path"
 
-export async function walk(dir: string, parentPath?: string): Promise<{ path: string, parentPath?: string }[]> {
+export async function walk(dir: string, parentPath?: string): Promise<{ path: string; parentPath?: string }[]> {
 	const immediateFiles = await readdir(dir)
 
 	const recursiveFiles = await Promise.all(
-		immediateFiles.map(async file => {
+		immediateFiles.map(async (file) => {
 			const path = join(dir, file)
 			const stats = await stat(path)
 			if (stats.isDirectory()) {
@@ -13,11 +13,11 @@ export async function walk(dir: string, parentPath?: string): Promise<{ path: st
 				const docPath = `${basename(path)}.mdx`
 				return walk(path, immediateFiles.includes(docPath) ? join(dirname(path), docPath) : parentPath)
 			} else if (stats.isFile()) {
-				return [{ path: path, parentPath: parentPath }]
+				return [{ path, parentPath }]
 			} else {
 				return []
 			}
-		})
+		}),
 	)
 
 	const flattenedFiles = recursiveFiles.reduce((all, folderContents) => all.concat(folderContents), [])

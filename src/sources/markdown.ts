@@ -1,10 +1,14 @@
+/* eslint-disable import/no-unresolved */
+/* eslint-disable no-shadow */
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+
 import { readFile } from "fs/promises"
 import { createHash } from "crypto"
 import { ObjectExpression } from "estree"
 import GithubSlugger from "github-slugger"
 import { Content, Root } from "mdast"
 import { fromMarkdown } from "mdast-util-from-markdown"
-import { MdxjsEsm, mdxFromMarkdown } from "mdast-util-mdx"
+import { mdxFromMarkdown, type MdxjsEsm } from "mdast-util-mdx"
 import { toMarkdown } from "mdast-util-to-markdown"
 import { toString } from "mdast-util-to-string"
 import { mdxjs } from "micromark-extension-mdxjs"
@@ -25,7 +29,11 @@ export abstract class BaseSource {
 	meta?: Json
 	sections?: Section[]
 
-	constructor(public source: string, public path: string, public parentPath?: string) {}
+	constructor(
+		public source: string,
+		public path: string,
+		public parentPath?: string,
+	) {}
 
 	abstract load(): Promise<{ checksum: string; meta?: Json; sections: Section[] }>
 }
@@ -119,10 +127,7 @@ export function splitTreeBy(tree: Root, predicate: (node: Content) => boolean) {
  * ### My Heading [#my-custom-anchor]
  * ```
  */
-export function parseHeading(heading: string): {
-	heading: string
-	customAnchor?: string
-} {
+export function parseHeading(heading: string): { heading: string; customAnchor?: string } {
 	const match = heading.match(/(.*) *\[#(.*)\]/)
 	if (match) {
 		const [, heading, customAnchor] = match
@@ -139,10 +144,7 @@ export function parseHeading(heading: string): {
 export function processMdxForSearch(content: string): ProcessedMdx {
 	const checksum = createHash("sha256").update(content).digest("base64")
 
-	const mdxTree = fromMarkdown(content, {
-		extensions: [mdxjs()],
-		mdastExtensions: [mdxFromMarkdown()],
-	})
+	const mdxTree = fromMarkdown(content, { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] })
 
 	const meta = extractMetaExport(mdxTree)
 
@@ -200,7 +202,11 @@ export type ProcessedMdx = {
 export class MarkdownSource extends BaseSource {
 	type = "markdown" as const
 
-	constructor(source: string, public filePath: string, public parentFilePath?: string) {
+	constructor(
+		source: string,
+		public filePath: string,
+		public parentFilePath?: string,
+	) {
 		const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
 		const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
 
