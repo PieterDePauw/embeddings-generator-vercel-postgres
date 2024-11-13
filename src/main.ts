@@ -132,7 +132,7 @@ async function run(): Promise<void> {
 
 		// Check if the inputs are provided
 		if (!databaseUrl || !openaiApiKey) {
-			throw new Error("DATABASE_URL and OPENAI_API_KEY must be provided.")
+			throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.")
 		}
 
 		// Generate embeddings
