@@ -68,7 +68,7 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 
 	for (const source of sources) {
 		try {
-			const existingPage = (await db.select().from(documents).where(eq(documents.path, source.path)).limit(1))[0]
+			const [existingPage] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
 			// const existingPageId: string = existingPage?.id
 
 			const newId: string = uuidv4()

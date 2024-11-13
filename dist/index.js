@@ -94578,7 +94578,13 @@ function generateEmbeddings(_a) {
         const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
         // const client = createClient({ connectionString: databaseUrl })
         // const db = drizzle(client)
-        const pool = createPool({ connectionString: databaseUrl, max: 1, ssl: { rejectUnauthorized: false } });
+        // Create a connection pool to the database
+        const pool = createPool({
+            connectionString: databaseUrl,
+            ssl: { rejectUnauthorized: false },
+            max: 1,
+        });
+        // Create a Drizzle instance
         const db = drizzle(pool);
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
@@ -94593,7 +94599,7 @@ function generateEmbeddings(_a) {
         console.log(`Discovered ${sources.length} pages.`);
         for (const source of sources) {
             try {
-                const existingPage = (yield db.select().from(pages).where(eq(pages.path, source.path)).limit(1))[0];
+                const [existingPage] = yield db.select().from(pages).where(eq(pages.path, source.path)).limit(1);
                 // const existingPageId: string = existingPage?.id
                 const newId = esm_v4();
                 const pageData = {
