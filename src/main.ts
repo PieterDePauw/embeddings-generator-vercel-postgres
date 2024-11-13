@@ -8,7 +8,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
 import { v4 as uuidv4 } from "uuid"
 import { walk } from "./sources/util"
-import { MarkdownSource } from "./sources/markdown"
+import { MarkdownSource, type MarkdownSourceType } from "./sources/markdown"
 import { pages as documents, pageSections as documentSections, type InsertPageSection } from "./db/schema"
 
 // interface Page {
@@ -37,10 +37,13 @@ type GenerateSourcesType = { docsRootPath: string; ignoredFiles: string[] }
 // Define the generateSources function
 async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }: GenerateSourcesType): Promise<MarkdownSource[]> {
 	// Walk through the docs root path
-	const embeddingSources = (await walk(docsRootPath))
+	const embeddingSources: MarkdownSourceType[] = (await walk(docsRootPath))
 		.filter(({ path }) => /\.mdx?$/.test(path))
 		.filter(({ path }) => !ignoredFiles.includes(path))
-		.map((entry) => new MarkdownSource("markdown", entry.path))
+		.map(async (entry) => await generateEmbeddings(entry.path, entry.parentPath))
+
+	// .map(Promise.all(({ path, parentPath }) => generateEmbeddings(path, parentPath)))
+	// .map((entry) => new MarkdownSource("markdown", entry.path))
 
 	// Log the number of discovered pages
 	console.log(`Discovered ${embeddingSources.length} pages`)
@@ -67,18 +70,19 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	// > Create a list of ignored files
 	const ignoredFiles = ["pages/404.mdx"]
 
-	const markdownFiles = (await walk(docsRootPath)).filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path))
+	const sources = await generateSources({ docsRootPath, ignoredFiles })
+	// .map((entry) => new MarkdownSource("markdown", entry.path, entry.parentPath))
 
-	const sources = await Promise.all(
-		markdownFiles.map(async ({ path, parentPath }) => {
-			const { filePath, parentFilePath, source, type } = new MarkdownSource("markdown", path, parentPath)
-			const { checksum, meta, sections } = await source.load()
-			return { path: filePath, checksum: checksum, type: type, source: source, meta: meta, parent_page_path: parentFilePath, sections: sections }
-		}),
-	)
+	// const sources = await Promise.all(
+	// 	markdownFiles.map(async ({ path, parentPath }) => {
+	// 		const { filePath, parentFilePath, source, type } = new MarkdownSource("markdown", path, parentPath)
+	// 		const { checksum, meta, sections } = await source.load()
+	// 		return { path: filePath, checksum: checksum, type: type, source: source, meta: meta, parent_page_path: parentFilePath, sections: sections }
+	// 	}),
+	// )
 
 	// > Log the number of pages discovered
-	console.log(`Discovered ${sources.length} pages.`)
+	// console.log(`Discovered ${sources.length} pages.`)
 
 	// > Process each source file and generate embeddings
 	for (const source of sources) {
