@@ -57,7 +57,8 @@ export async function generateMarkdownSource(filePath: string, parentFilePath?: 
 }
 
 // Main function to generate embeddings
-async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: { databaseUrl: string; openaiApiKey: string; docsRootPath: string }): Promise<void> {
+// prettier-ignore
+async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath, shouldRefresh }: { databaseUrl: string; openaiApiKey: string; docsRootPath: string, shouldRefresh: boolean }): Promise<void> {
 	// > Initialize OpenAI client
 	const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" })
 
@@ -70,9 +71,6 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	// > Create a new refresh version and a new refresh date
 	const refreshVersion = uuid()
 	const refreshDate = new Date()
-
-	// > Determine the state of the shouldRefresh flag
-	const shouldRefresh = false
 
 	// > Create a list of ignored files
 	const ignoredFiles = ["pages/404.mdx"]
@@ -213,11 +211,14 @@ async function run(): Promise<void> {
 		const openaiApiKey: string | undefined = core.getInput("openai-api-key")
 		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
 
+		// > Determine the state of the shouldRefresh flag
+		const shouldRefresh: boolean = false
+
 		// >> Check if the inputs are provided
 		if (!databaseUrl || !openaiApiKey) throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.")
 
 		// >> Generate embeddings
-		await generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath })
+		await generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath, shouldRefresh: shouldRefresh })
 	} catch (error) {
 		// >> Log the error
 		core.setFailed(error.message)
