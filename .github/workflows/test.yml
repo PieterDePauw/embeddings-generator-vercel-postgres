@@ -1,27 +1,26 @@
-name: 'build-test'
+name: "build-test"
 on: # rebuild any PRs and main branch changes
-  pull_request:
-  push:
-    branches:
-      - main
-      - 'releases/*'
+    pull_request:
+    push:
+        branches:
+            - main
+            - "releases/*"
 
 jobs:
-  build: # make sure build/ci work properly
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          npm install
-      - run: |
-          npm run all
-  test: # make sure the action works on a clean machine without building
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          supabase-url: 'https://nihypcognmeejjrivnde.supabase.co'
-          supabase-service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          openai-key: ${{ secrets.OPENAI_KEY }}
-          docs-root-path: 'docs'
+    build: # make sure build/ci work properly
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - run: |
+                  npm install
+            - run: |
+                  npm run all
+    test: # make sure the action works on a clean machine without building
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: ./
+              with:
+                  database-url: ${{ secrets.OPENAI_KEY }}
+                  openai-api-key: ${{ secrets.OPENAI_KEY }}
+                  docs-root-path: "docs/"
