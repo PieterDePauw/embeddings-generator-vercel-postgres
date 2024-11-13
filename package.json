@@ -10,7 +10,15 @@
 		"lint": "eslint src/**/*.ts",
 		"package": "ncc build --source-map --license licenses.txt",
 		"test": "jest",
-		"all": "npm run format && npm run package"
+		"all": "npm run format && npm run package",
+		"db:check": "drizzle-kit check",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:pull": "drizzle-kit pull",
+		"db:push": "drizzle-kit push",
+		"db:studio": "drizzle-kit studio",
+		"db:up": "drizzle-kit up",
+		"db:drop": "drizzle-kit drop"
 	},
 	"keywords": [
 		"actions",

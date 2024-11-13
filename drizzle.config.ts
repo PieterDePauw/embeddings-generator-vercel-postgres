@@ -1,13 +1,13 @@
 // Import modules
 import * as core from "@actions/core"
 import { defineConfig } from "drizzle-kit"
-// import { config } from "dotenv"
+import { config } from "dotenv"
 
 // Load environment variables
-// config({ path: ".env.local" })
+config({ path: ".env.local" })
 
 // Get the input values
-const postgresDbUrl: string = core.getInput("postgres-database-url")
+const postgresDbUrl: string = core.getInput("database-url") || process.env.DATABASE_URL
 
 // Create a configuration object for Drizzle
 export default defineConfig({

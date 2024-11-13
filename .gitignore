@@ -100,3 +100,8 @@ lib/**/*
 
 # deprecated
 .deprecated
+
+# env
+.env
+.env*
+!.env.example

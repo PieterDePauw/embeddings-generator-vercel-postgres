@@ -21,6 +21,6 @@ jobs:
             - uses: actions/checkout@v4
             - uses: ./
               with:
-                  database-url: ${{ secrets.POSTGRES_URL }}
-                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-                  docs-root-path: "docs/"
+                  database-url: ${{ env.DATABASE_URL }}
+                  openai-api-key: ${{ env.OPENAI_API_KEY }}
+                  #docs-root-path: "docs/"
