@@ -42,7 +42,7 @@ async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] 
 		(await walk(docsRootPath))
 			.filter(({ path }) => /\.mdx?$/.test(path))
 			.filter(({ path }) => !ignoredFiles.includes(path))
-			.map((entry) => generateMarkdownSource(entry.path, entry.parentPath)),
+			.map(({ path, parentPath }) => generateMarkdownSource(path, parentPath)),
 	)
 
 	// Log the number of discovered pages
@@ -60,12 +60,8 @@ async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] 
  */
 export async function generateMarkdownSource(filePath: string, parentFilePath?: string): Promise<MarkdownSourceType> {
 	// Extract the path and parent path
-	const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
-	const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
-
-	// Define the source and type
-	const source = "markdown"
-	const type = "markdown"
+	// const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
+	// const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
 
 	// Read the file contents asynchronously
 	const contents = await readFile(filePath, "utf8")
@@ -74,15 +70,7 @@ export async function generateMarkdownSource(filePath: string, parentFilePath?: 
 	const { checksum, meta, sections } = processMdxForSearch(contents)
 
 	// Return the desired object
-	return {
-		path: filePath,
-		checksum: checksum,
-		type: type,
-		source: source,
-		meta: meta,
-		parent_page_path: parentFilePath,
-		sections: sections,
-	}
+	return { path: filePath, checksum: checksum, type: "markdown", source: "markdown", meta: meta, parent_page_path: parentFilePath, sections: sections }
 }
 
 // Main function to generate embeddings

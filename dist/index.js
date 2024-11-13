@@ -94607,7 +94607,7 @@ function generateSources(_a) {
         const embeddingSources = yield Promise.all((yield walk(docsRootPath))
             .filter(({ path }) => /\.mdx?$/.test(path))
             .filter(({ path }) => !ignoredFiles.includes(path))
-            .map((entry) => generateMarkdownSource(entry.path, entry.parentPath)));
+            .map(({ path, parentPath }) => generateMarkdownSource(path, parentPath)));
         // Log the number of discovered pages
         console.log(`Discovered ${embeddingSources.length} pages`);
         // Return the embedding sources
@@ -94623,25 +94623,14 @@ function generateSources(_a) {
 function generateMarkdownSource(filePath, parentFilePath) {
     return main_awaiter(this, void 0, void 0, function* () {
         // Extract the path and parent path
-        const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
-        const parentPath = parentFilePath === null || parentFilePath === void 0 ? void 0 : parentFilePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
-        // Define the source and type
-        const source = "markdown";
-        const type = "markdown";
+        // const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
+        // const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
         // Read the file contents asynchronously
         const contents = yield (0,promises_namespaceObject.readFile)(filePath, "utf8");
         // Process the contents of the MDX file for search and extract the checksum, meta, and sections
         const { checksum, meta, sections } = processMdxForSearch(contents);
         // Return the desired object
-        return {
-            path: filePath,
-            checksum: checksum,
-            type: type,
-            source: source,
-            meta: meta,
-            parent_page_path: parentFilePath,
-            sections: sections,
-        };
+        return { path: filePath, checksum: checksum, type: "markdown", source: "markdown", meta: meta, parent_page_path: parentFilePath, sections: sections };
     });
 }
 // Main function to generate embeddings
