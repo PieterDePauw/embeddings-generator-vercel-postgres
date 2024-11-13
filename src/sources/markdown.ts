@@ -43,22 +43,24 @@ export abstract class BaseSource {
  * into a plain JavaScript object.
  */
 export function getObjectFromExpression(node: ObjectExpression) {
+	// > Reduce the properties of the object expression into a plain object
 	return node.properties.reduce<Record<string, string | number | bigint | true | RegExp | undefined>>((object, property) => {
+		// >> Skip non-property nodes
 		if (property.type !== "Property") {
 			return object
 		}
 
+		// >> Extract the key and value of the property
 		const key = (property.key.type === "Identifier" && property.key.name) || undefined
 		const value = (property.value.type === "Literal" && property.value.value) || undefined
 
+		// >> If the key is not a truthy value, return the object as is
 		if (!key) {
 			return object
 		}
 
-		return {
-			...object,
-			[key]: value,
-		}
+		// >> Return the object with the key-value pair
+		return { ...object, [key]: value }
 	}, {})
 }
 
@@ -68,6 +70,7 @@ export function getObjectFromExpression(node: ObjectExpression) {
  * This info is akin to frontmatter.
  */
 export function extractMetaExport(mdxTree: Root) {
+	// > Find the `meta` export node in the MDX tree
 	const metaExportNode = mdxTree.children.find((node): node is MdxjsEsm => {
 		return (
 			node.type === "mdxjsEsm" &&
@@ -78,10 +81,12 @@ export function extractMetaExport(mdxTree: Root) {
 		)
 	})
 
+	// > If there's no `meta` export node, return undefined
 	if (!metaExportNode) {
 		return undefined
 	}
 
+	// > Extract the `ObjectExpression` from the `meta` export node
 	const objectExpression =
 		(metaExportNode.data?.estree?.body[0]?.type === "ExportNamedDeclaration" &&
 			metaExportNode.data.estree.body[0].declaration?.type === "VariableDeclaration" &&
@@ -91,14 +96,16 @@ export function extractMetaExport(mdxTree: Root) {
 			metaExportNode.data.estree.body[0].declaration.declarations[0].init) ||
 		undefined
 
+	// > If there's no `ObjectExpression`, return undefined
 	if (!objectExpression) {
 		return undefined
 	}
 
+	// > Return the object extracted from the `ObjectExpression`
 	return getObjectFromExpression(objectExpression)
 }
 
-/**
+/*
  * Splits a `mdast` tree into multiple trees based on
  * a predicate function. Will include the splitting node
  * at the beginning of each tree.
@@ -106,15 +113,24 @@ export function extractMetaExport(mdxTree: Root) {
  * Useful to split a markdown file into smaller sections.
  */
 export function splitTreeBy(tree: Root, predicate: (node: Content) => boolean) {
-	return tree.children.reduce<Root[]>((trees, node) => {
+	// > Reduce the children of the tree into an array of trees
+	return tree.children.reduce<Root[]>((trees: Root[], node: Content) => {
+		// >> Get the last tree in the array
 		const [lastTree] = trees.slice(-1)
 
+		// >> If there's no last tree or the predicate is true for the current node
 		if (!lastTree || predicate(node)) {
-			const tree: Root = u("root", [node])
-			return trees.concat(tree)
+			// >>> Create a new tree with the current node
+			const newTree: Root = u("root", [node])
+
+			// >>> Return the array with the new
+			return trees.concat(newTree)
 		}
 
+		// >> Push the current node as a child of the last tree
 		lastTree.children.push(node)
+
+		// >> Return the array with the last tree
 		return trees
 	}, [])
 }
@@ -141,28 +157,31 @@ export function parseHeading(heading: string): { heading: string; customAnchor?:
  * It extracts metadata, strips it of all JSX,
  * and splits it into sub-sections based on criteria.
  */
-export function processMdxForSearch(content: string): ProcessedMdx {
+export function processMdxForSearch(content: string): { checksum: string; meta: Json; sections: Section[] } {
+	// > Create a hash of the content to use as a checksum
 	const checksum = createHash("sha256").update(content).digest("base64")
 
+	// > Parse the MDX content into a MDX tree
 	const mdxTree = fromMarkdown(content, { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] })
 
+	// > Extract metadata from the MDX tree
 	const meta = extractMetaExport(mdxTree)
 
+	// > Serialize the metadata to make it JSON serializable
 	const serializableMeta: Json = meta && JSON.parse(JSON.stringify(meta))
 
-	// Remove all MDX elements from markdown
+	// > Filter out JSX nodes from the MDX tree (so we only have markdown nodes)
 	const mdTree = filter(mdxTree, (node) => !["mdxjsEsm", "mdxJsxFlowElement", "mdxJsxTextElement", "mdxFlowExpression", "mdxTextExpression"].includes(node.type))
 
+	// > If there's no markdown tree, return an empty object
 	if (!mdTree) {
-		return {
-			checksum,
-			meta: serializableMeta,
-			sections: [],
-		}
+		return { checksum: checksum, meta: serializableMeta, sections: [] }
 	}
 
+	// > Split the markdown tree into sections based on headings
 	const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading")
 
+	// > Create a slugger to generate slugs for headings
 	const slugger = new GithubSlugger()
 
 	const sections = sectionTrees.map((tree) => {
@@ -179,24 +198,10 @@ export function processMdxForSearch(content: string): ProcessedMdx {
 
 		const slug = slugger.slug(customAnchor ?? heading)
 
-		return {
-			content,
-			heading,
-			slug,
-		}
+		return { content, heading, slug }
 	})
 
-	return {
-		checksum,
-		meta: serializableMeta,
-		sections,
-	}
-}
-
-export type ProcessedMdx = {
-	checksum: string
-	meta: Json
-	sections: Section[]
+	return { checksum, meta: serializableMeta, sections }
 }
 
 export class MarkdownSource extends BaseSource {
@@ -222,10 +227,6 @@ export class MarkdownSource extends BaseSource {
 		this.meta = meta
 		this.sections = sections
 
-		return {
-			checksum,
-			meta,
-			sections,
-		}
+		return { checksum, meta, sections }
 	}
 }

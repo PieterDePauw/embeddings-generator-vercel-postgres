@@ -31,30 +31,25 @@ import { pages as documents, pageSections as documentSections, type InsertPageSe
 // 	token_count: number
 // }
 
+// Main function to generate embeddings
 async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: { databaseUrl: string; openaiApiKey: string; docsRootPath: string }): Promise<void> {
-	// Initialize OpenAI client
+	// > Initialize OpenAI client
 	const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" })
 
-	// const client = createClient({ connectionString: databaseUrl })
-	// const db = drizzle(client)
+	// > Create a connection pool to the database
+	const pool = createPool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 1 })
 
-	// Create a connection pool to the database
-	const pool = createPool({
-		connectionString: databaseUrl,
-		ssl: { rejectUnauthorized: false },
-		max: 1,
-	})
-
-	// Create a Drizzle instance
+	// > Create a Drizzle instance
 	const db = drizzle(pool)
 
+	// > Create a new refresh version and a new refresh date
 	const refreshVersion = uuidv4()
 	const refreshDate = new Date()
 
+	// > Create a list of ignored files
 	const ignoredFiles = ["pages/404.mdx"]
 
-	const files = await walk(docsRootPath)
-	const markdownFiles = files.filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path))
+	const markdownFiles = (await walk(docsRootPath)).filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path))
 
 	const sources = await Promise.all(
 		markdownFiles.map(async ({ path, parentPath }) => {
@@ -64,12 +59,13 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 		}),
 	)
 
+	// > Log the number of pages discovered
 	console.log(`Discovered ${sources.length} pages.`)
 
+	// > Process each source file and generate embeddings
 	for (const source of sources) {
 		try {
 			const [existingPage] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
-			// const existingPageId: string = existingPage?.id
 
 			const newId: string = uuidv4()
 
@@ -104,13 +100,14 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 			const { sections } = source
 
 			for (const section of sections) {
-				// Embed the content of the section
-				const { value, embedding, usage } = await embed({
-					model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
-					value: section.content.replace(/\n/g, " "),
-				})
+				// Assign the content to a constant
+				const input = section.content.replace(/\n/g, " ")
 
-				const insertPageData: InsertPageSection = {
+				// Embed the content of the section
+				const { value, embedding, usage } = await embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input })
+
+				// Insert the section into the database
+				await db.insert(documentSections).values({
 					id: uuidv4(),
 					page_id: existingPage?.id || newId,
 					heading: section.heading,
@@ -118,9 +115,7 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 					content: section.content || value,
 					embedding: embedding,
 					token_count: usage.tokens,
-				}
-
-				await db.insert(documentSections).values(insertPageData)
+				})
 			}
 		} catch (error) {
 			console.error(`Error processing ${source.path}:`, error)
@@ -133,23 +128,26 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	console.log("Embedding generation complete.")
 }
 
+// Function to run the action
 async function run(): Promise<void> {
 	try {
-		// Get the inputs
+		// > Get the inputs
 		const databaseUrl: string | undefined = core.getInput("database-url")
 		const openaiApiKey: string | undefined = core.getInput("openai-api-key")
 		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
 
-		// Check if the inputs are provided
+		// > Check if the inputs are provided
 		if (!databaseUrl || !openaiApiKey) {
 			throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.")
 		}
 
-		// Generate embeddings
+		// > Generate embeddings
 		await generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath })
 	} catch (error) {
+		// > Log the error
 		core.setFailed(error.message)
 	}
 }
 
+// Run the action
 run()

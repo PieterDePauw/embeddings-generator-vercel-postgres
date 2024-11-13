@@ -94357,15 +94357,20 @@ class BaseSource {
  * into a plain JavaScript object.
  */
 function getObjectFromExpression(node) {
+    // > Reduce the properties of the object expression into a plain object
     return node.properties.reduce((object, property) => {
+        // >> Skip non-property nodes
         if (property.type !== "Property") {
             return object;
         }
+        // >> Extract the key and value of the property
         const key = (property.key.type === "Identifier" && property.key.name) || undefined;
         const value = (property.value.type === "Literal" && property.value.value) || undefined;
+        // >> If the key is not a truthy value, return the object as is
         if (!key) {
             return object;
         }
+        // >> Return the object with the key-value pair
         return Object.assign(Object.assign({}, object), { [key]: value });
     }, {});
 }
@@ -94376,6 +94381,7 @@ function getObjectFromExpression(node) {
  */
 function extractMetaExport(mdxTree) {
     var _a, _b, _c, _d, _e, _f;
+    // > Find the `meta` export node in the MDX tree
     const metaExportNode = mdxTree.children.find((node) => {
         var _a, _b, _c, _d, _e;
         return (node.type === "mdxjsEsm" &&
@@ -94384,9 +94390,11 @@ function extractMetaExport(mdxTree) {
             ((_e = node.data.estree.body[0].declaration.declarations[0]) === null || _e === void 0 ? void 0 : _e.id.type) === "Identifier" &&
             node.data.estree.body[0].declaration.declarations[0].id.name === "meta");
     });
+    // > If there's no `meta` export node, return undefined
     if (!metaExportNode) {
         return undefined;
     }
+    // > Extract the `ObjectExpression` from the `meta` export node
     const objectExpression = (((_c = (_b = (_a = metaExportNode.data) === null || _a === void 0 ? void 0 : _a.estree) === null || _b === void 0 ? void 0 : _b.body[0]) === null || _c === void 0 ? void 0 : _c.type) === "ExportNamedDeclaration" &&
         ((_d = metaExportNode.data.estree.body[0].declaration) === null || _d === void 0 ? void 0 : _d.type) === "VariableDeclaration" &&
         ((_e = metaExportNode.data.estree.body[0].declaration.declarations[0]) === null || _e === void 0 ? void 0 : _e.id.type) === "Identifier" &&
@@ -94394,12 +94402,14 @@ function extractMetaExport(mdxTree) {
         ((_f = metaExportNode.data.estree.body[0].declaration.declarations[0].init) === null || _f === void 0 ? void 0 : _f.type) === "ObjectExpression" &&
         metaExportNode.data.estree.body[0].declaration.declarations[0].init) ||
         undefined;
+    // > If there's no `ObjectExpression`, return undefined
     if (!objectExpression) {
         return undefined;
     }
+    // > Return the object extracted from the `ObjectExpression`
     return getObjectFromExpression(objectExpression);
 }
-/**
+/*
  * Splits a `mdast` tree into multiple trees based on
  * a predicate function. Will include the splitting node
  * at the beginning of each tree.
@@ -94407,13 +94417,20 @@ function extractMetaExport(mdxTree) {
  * Useful to split a markdown file into smaller sections.
  */
 function splitTreeBy(tree, predicate) {
+    // > Reduce the children of the tree into an array of trees
     return tree.children.reduce((trees, node) => {
+        // >> Get the last tree in the array
         const [lastTree] = trees.slice(-1);
+        // >> If there's no last tree or the predicate is true for the current node
         if (!lastTree || predicate(node)) {
-            const tree = u("root", [node]);
-            return trees.concat(tree);
+            // >>> Create a new tree with the current node
+            const newTree = u("root", [node]);
+            // >>> Return the array with the new
+            return trees.concat(newTree);
         }
+        // >> Push the current node as a child of the last tree
         lastTree.children.push(node);
+        // >> Return the array with the last tree
         return trees;
     }, []);
 }
@@ -94439,20 +94456,23 @@ function parseHeading(heading) {
  * and splits it into sub-sections based on criteria.
  */
 function processMdxForSearch(content) {
+    // > Create a hash of the content to use as a checksum
     const checksum = (0,external_crypto_.createHash)("sha256").update(content).digest("base64");
+    // > Parse the MDX content into a MDX tree
     const mdxTree = fromMarkdown(content, { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] });
+    // > Extract metadata from the MDX tree
     const meta = extractMetaExport(mdxTree);
+    // > Serialize the metadata to make it JSON serializable
     const serializableMeta = meta && JSON.parse(JSON.stringify(meta));
-    // Remove all MDX elements from markdown
+    // > Filter out JSX nodes from the MDX tree (so we only have markdown nodes)
     const mdTree = filter(mdxTree, (node) => !["mdxjsEsm", "mdxJsxFlowElement", "mdxJsxTextElement", "mdxFlowExpression", "mdxTextExpression"].includes(node.type));
+    // > If there's no markdown tree, return an empty object
     if (!mdTree) {
-        return {
-            checksum,
-            meta: serializableMeta,
-            sections: [],
-        };
+        return { checksum: checksum, meta: serializableMeta, sections: [] };
     }
+    // > Split the markdown tree into sections based on headings
     const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading");
+    // > Create a slugger to generate slugs for headings
     const slugger = new BananaSlug();
     const sections = sectionTrees.map((tree) => {
         const [firstNode] = tree.children;
@@ -94463,17 +94483,9 @@ function processMdxForSearch(content) {
         }
         const { heading, customAnchor } = parseHeading(rawHeading);
         const slug = slugger.slug(customAnchor !== null && customAnchor !== void 0 ? customAnchor : heading);
-        return {
-            content,
-            heading,
-            slug,
-        };
+        return { content, heading, slug };
     });
-    return {
-        checksum,
-        meta: serializableMeta,
-        sections,
-    };
+    return { checksum, meta: serializableMeta, sections };
 }
 class MarkdownSource extends BaseSource {
     constructor(source, filePath, parentFilePath) {
@@ -94491,11 +94503,7 @@ class MarkdownSource extends BaseSource {
             this.checksum = checksum;
             this.meta = meta;
             this.sections = sections;
-            return {
-                checksum,
-                meta,
-                sections,
-            };
+            return { checksum, meta, sections };
         });
     }
 }
@@ -94572,35 +94580,32 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 // 	embedding: number[]
 // 	token_count: number
 // }
+// Main function to generate embeddings
 function generateEmbeddings(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath }) {
-        // Initialize OpenAI client
+        // > Initialize OpenAI client
         const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
-        // const client = createClient({ connectionString: databaseUrl })
-        // const db = drizzle(client)
-        // Create a connection pool to the database
-        const pool = createPool({
-            connectionString: databaseUrl,
-            ssl: { rejectUnauthorized: false },
-            max: 1,
-        });
-        // Create a Drizzle instance
+        // > Create a connection pool to the database
+        const pool = createPool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 1 });
+        // > Create a Drizzle instance
         const db = drizzle(pool);
+        // > Create a new refresh version and a new refresh date
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
+        // > Create a list of ignored files
         const ignoredFiles = ["pages/404.mdx"];
-        const files = yield walk(docsRootPath);
-        const markdownFiles = files.filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path));
+        const markdownFiles = (yield walk(docsRootPath)).filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path));
         const sources = yield Promise.all(markdownFiles.map((_a) => main_awaiter(this, [_a], void 0, function* ({ path, parentPath }) {
             const source = new MarkdownSource("markdown", path, parentPath);
             const sourcePart2 = yield source.load();
             return Object.assign(source, sourcePart2, {});
         })));
+        // > Log the number of pages discovered
         console.log(`Discovered ${sources.length} pages.`);
+        // > Process each source file and generate embeddings
         for (const source of sources) {
             try {
                 const [existingPage] = yield db.select().from(pages).where(eq(pages.path, source.path)).limit(1);
-                // const existingPageId: string = existingPage?.id
                 const newId = esm_v4();
                 const pageData = {
                     path: source.path,
@@ -94630,12 +94635,12 @@ function generateEmbeddings(_a) {
                 // Generate embeddings
                 const { sections } = source;
                 for (const section of sections) {
+                    // Assign the content to a constant
+                    const input = section.content.replace(/\n/g, " ");
                     // Embed the content of the section
-                    const { value, embedding, usage } = yield dist_embed({
-                        model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }),
-                        value: section.content.replace(/\n/g, " "),
-                    });
-                    const insertPageData = {
+                    const { value, embedding, usage } = yield dist_embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input });
+                    // Insert the section into the database
+                    yield db.insert(pageSections).values({
                         id: esm_v4(),
                         page_id: (existingPage === null || existingPage === void 0 ? void 0 : existingPage.id) || newId,
                         heading: section.heading,
@@ -94643,8 +94648,7 @@ function generateEmbeddings(_a) {
                         content: section.content || value,
                         embedding: embedding,
                         token_count: usage.tokens,
-                    };
-                    yield db.insert(pageSections).values(insertPageData);
+                    });
                 }
             }
             catch (error) {
@@ -94656,25 +94660,28 @@ function generateEmbeddings(_a) {
         console.log("Embedding generation complete.");
     });
 }
+// Function to run the action
 function run() {
     return main_awaiter(this, void 0, void 0, function* () {
         try {
-            // Get the inputs
+            // > Get the inputs
             const databaseUrl = core.getInput("database-url");
             const openaiApiKey = core.getInput("openai-api-key");
             const docsRootPath = core.getInput("docs-root-path") || "docs/";
-            // Check if the inputs are provided
+            // > Check if the inputs are provided
             if (!databaseUrl || !openaiApiKey) {
                 throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.");
             }
-            // Generate embeddings
+            // > Generate embeddings
             yield generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath });
         }
         catch (error) {
+            // > Log the error
             core.setFailed(error.message);
         }
     });
 }
+// Run the action
 run();
 
 })();
