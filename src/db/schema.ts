@@ -10,7 +10,7 @@ export const documents = pgTable("documents", {
 	type: text("type"),
 	source: text("source"),
 	meta: text("meta"),
-	parent_page_path: text("parent_page_path").references((): AnyPgColumn => documents.path),
+	parent_document_path: text("parent_document_path").references((): AnyPgColumn => documents.path),
 	version: varchar("version"),
 	last_refresh: timestamp("last_refresh").defaultNow(),
 	created_at: timestamp("created_at").notNull().defaultNow(),
@@ -21,7 +21,7 @@ export const documents = pgTable("documents", {
 // prettier-ignore
 export const documentSections = pgTable("document_sections", {
 	id: varchar("id").primaryKey(),
-	page_id: varchar("page_id").references((): AnyPgColumn => documents.id).notNull(),
+	document_id: varchar("document_id").references((): AnyPgColumn => documents.id).notNull(),
 	slug: text("slug").notNull(),
 	heading: text("heading").notNull(),
 	content: text("content").notNull(),
