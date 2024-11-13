@@ -1,4 +1,4 @@
-name: "vercel-embeddings-generator"
+name: "vercel-embeddings-action"
 description: "Generate embeddings from your Knowledge Base to use with Supabase Vector."
 author: "PieterDePauw"
 branding:
@@ -12,7 +12,7 @@ inputs:
         required: true
         description: "Your OpenAI API key"
     docs-root-path:
-        required: true
+        required: false
         description: "The path to the root of your knowledge base / docs folder"
         default: "docs/"
 runs:
