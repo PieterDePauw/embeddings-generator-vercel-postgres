@@ -22,48 +22,24 @@ export type Json = Record<string, string | number | boolean | null | Json[] | { 
 export type Section = { content: string; heading?: string; slug?: string }
 
 /**
- * * Abstract base class representing a source of data.
- */
-export abstract class BaseSource {
-	checksum?: string
-	meta?: Json
-	sections?: Section[]
-
-	constructor(
-		public source: string,
-		public path: string,
-		public parentPath?: string,
-	) {}
-
-	abstract load(): Promise<{ checksum: string; meta?: Json; sections: Section[] }>
-}
-
-/**
  * Extracts ES literals from an `estree` `ObjectExpression`
  * into a plain JavaScript object.
  */
 export function getObjectFromExpression(node: ObjectExpression) {
 	// > Reduce the properties of the object expression into a plain object
 	return node.properties.reduce<Record<string, string | number | bigint | true | RegExp | undefined>>((object, property) => {
-		// >> Skip non-property nodes
-		if (property.type !== "Property") {
-			return object
-		}
+		// >> If the type of the property is not "Property", return the object as is
+		if (property.type !== "Property") return object
 
 		// >> Extract the key and value of the property
 		const key = (property.key.type === "Identifier" && property.key.name) || undefined
 		const value = (property.value.type === "Literal" && property.value.value) || undefined
 
 		// >> If the key is not a truthy value, return the object as is
-		if (!key) {
-			return object
-		}
+		if (!key) return object
 
-		// >> Return the object with the key-value pair
-		return {
-			...object,
-			[key]: value,
-		}
+		// >> If the key is a truthy value, return the object with the key-value pair appended to it
+		return { ...object, [key]: value }
 	}, {})
 }
 
@@ -147,11 +123,14 @@ export function splitTreeBy(tree: Root, predicate: (node: Content) => boolean) {
  * ```
  */
 export function parseHeading(heading: string): { heading: string; customAnchor?: string } {
+	// > Match the heading against a regular expression
 	const match = heading.match(/(.*) *\[#(.*)\]/)
+	// > If there's a match, return the heading and the custom anchor
 	if (match) {
 		const [, heading, customAnchor] = match
 		return { heading: heading, customAnchor: customAnchor }
 	}
+	// > If there's no match, return just the heading
 	return { heading: heading }
 }
 
@@ -172,7 +151,7 @@ export function generateSlug({ heading, customAnchor }: { heading: string; custo
  */
 export function processMdxForSearch(content: string): { checksum: string; meta: Json; sections: Section[] } {
 	// > Create a hash of the content to use as a checksum
-	const checksum = createHash("sha256").update(content).digest("base64")
+	const checksum: string = createHash("sha256").update(content).digest("base64")
 
 	// > Parse the MDX content into a MDX tree
 	const mdxTree = fromMarkdown(content, { extensions: [mdxjs()], mdastExtensions: [mdxFromMarkdown()] })
@@ -187,40 +166,69 @@ export function processMdxForSearch(content: string): { checksum: string; meta: 
 	const mdTree = filter(mdxTree, (node) => !["mdxjsEsm", "mdxJsxFlowElement", "mdxJsxTextElement", "mdxFlowExpression", "mdxTextExpression"].includes(node.type))
 
 	// > If there's no markdown tree, return an empty object
-	if (!mdTree) {
-		return { checksum: checksum, meta: serializableMeta, sections: [] }
-	}
+	if (!mdTree) return { checksum: checksum, meta: serializableMeta, sections: [] }
 
 	// > Split the markdown tree into sections based on headings
 	const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading")
 
-	// > Create a slugger to generate slugs for headings
-	// const slugger = new GithubSlugger()
+	// > Generate sections from the section trees by extracting the heading and content of each section
+	const sections: Section[] = sectionTrees.map((sectionTree) => {
+		// >> Get the first node of the section tree
+		const [firstNode] = sectionTree.children
 
-	const sections = sectionTrees.map((tree) => {
-		const [firstNode] = tree.children
-		const content = toMarkdown(tree)
+		// >> Convert the section tree to markdown to get the content
+		const content = toMarkdown(sectionTree)
 
+		// >> Check if the first node has a type property set to "heading"
 		const rawHeading: string | undefined = firstNode.type === "heading" ? toString(firstNode) : undefined
 
-		if (!rawHeading) {
-			return { content: content }
-		}
+		// >> If it isn't a heading, just return the content
+		if (!rawHeading) return { content: content }
 
+		// >> If it is a heading, parse the raw heading to extract the heading and possibly a custom anchor
 		const { heading, customAnchor } = parseHeading(rawHeading)
 
-		// const slug = slugger.slug(customAnchor ?? heading)
-		const slug = generateSlug({ heading: heading, customAnchor: customAnchor })
+		// >> After parsing the heading, generate a slug from the heading or the custom anchor
+		const slug = generateSlug({ heading, customAnchor })
 
-		return { content, heading, slug }
+		// >> Return the content, heading, and slug
+		return { content: content, heading: heading, slug: slug }
 	})
 
+	// > Return the checksum, the metadata, and the sections
 	return { checksum: checksum, meta: serializableMeta, sections: sections }
 }
 
+/**
+ * * Abstract base class representing a source of data.
+ */
+export abstract class BaseSource {
+	checksum?: string
+	meta?: Json
+	sections?: Section[]
+
+	constructor(
+		public source: string,
+		public path: string,
+		public parentPath?: string,
+	) {}
+
+	abstract load(): Promise<{ checksum: string; meta?: Json; sections: Section[] }>
+}
+
+/**
+ * Represents a source of markdown content.
+ * Extends the BaseSource class to handle markdown-specific operations.
+ */
 export class MarkdownSource extends BaseSource {
 	type = "markdown" as const
 
+	/**
+	 * Creates an instance of MarkdownSource.
+	 * @param source - The source content as a string.
+	 * @param filePath - The file path to the markdown file.
+	 * @param parentFilePath - The optional file path to the parent markdown file.
+	 */
 	constructor(
 		source: string,
 		public filePath: string,
@@ -232,6 +240,11 @@ export class MarkdownSource extends BaseSource {
 		super(source, path, parentPath)
 	}
 
+	/**
+	 * Loads the markdown content from the file, processes it for search,
+	 * and sets the checksum, meta, and sections properties.
+	 * @returns An object containing the checksum, meta, and sections of the markdown content.
+	 */
 	async load() {
 		const contents = await readFile(this.filePath, "utf8")
 
