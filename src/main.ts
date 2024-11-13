@@ -8,8 +8,7 @@ import { drizzle } from "drizzle-orm/vercel-postgres"
 import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
 import { v4 as uuid } from "uuid"
-import { walk } from "./sources/util"
-import { processMdxForSearch, type Section, type Json } from "./sources/markdown"
+import { walk, processMdxForSearch, type Section, type Json } from "./sources/markdown"
 import { documents, documentSections, type DocumentType, type DocumentSectionType } from "./db/schema"
 
 // Define the MarkdownSourceType
