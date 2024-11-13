@@ -7,10 +7,10 @@ import { createPool } from "@vercel/postgres"
 import { drizzle } from "drizzle-orm/vercel-postgres"
 import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
-import { v4 as uuidv4 } from "uuid"
+import { v4 as uuid } from "uuid"
 import { walk } from "./sources/util"
 import { processMdxForSearch, type Section, type Json } from "./sources/markdown"
-import { pages as documents, pageSections as documentSections, type InsertPageSection } from "./db/schema"
+import { documents, documentSections, type DocumentType, type DocumentSectionType, type InsertDocumentType } from "./db/schema"
 
 // interface Page {
 // 	id: string
@@ -35,9 +35,12 @@ import { pages as documents, pageSections as documentSections, type InsertPageSe
 // Define the MarkdownSourceType
 export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_page_path?: string; sections: Section[] }
 
+// Define the Singular type
+export type Singular<T> = T extends any[] ? undefined : T
+
 // Define the generateSources function
 async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }: { docsRootPath: string; ignoredFiles: string[] }): Promise<MarkdownSourceType[]> {
-	// Walk through the docs root path
+	// > Walk through the docs root path
 	const embeddingSources = await Promise.all(
 		(await walk(docsRootPath))
 			.filter(({ path }) => /\.mdx?$/.test(path))
@@ -45,10 +48,10 @@ async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] 
 			.map(({ path, parentPath }) => generateMarkdownSource(path, parentPath)),
 	)
 
-	// Log the number of discovered pages
+	// > Log the number of discovered pages
 	console.log(`Discovered ${embeddingSources.length} pages`)
 
-	// Return the embedding sources
+	// > Return the embedding sources
 	return embeddingSources
 }
 
@@ -59,17 +62,17 @@ async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] 
  * @returns An object containing the path, checksum, type, source, meta, parent page path, and sections.
  */
 export async function generateMarkdownSource(filePath: string, parentFilePath?: string): Promise<MarkdownSourceType> {
-	// Extract the path and parent path
+	// > Extract the path and parent path
 	// const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
 	// const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
 
-	// Read the file contents asynchronously
-	const contents = await readFile(filePath, "utf8")
+	// > Read the file contents asynchronously
+	const contents: string = await readFile(filePath, "utf8")
 
-	// Process the contents of the MDX file for search and extract the checksum, meta, and sections
+	// > Process the contents of the MDX file for search and extract the checksum, meta, and sections
 	const { checksum, meta, sections } = processMdxForSearch(contents)
 
-	// Return the desired object
+	// > Return the desired object
 	return { path: filePath, checksum: checksum, type: "markdown", source: "markdown", meta: meta, parent_page_path: parentFilePath, sections: sections }
 }
 
@@ -85,62 +88,115 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	const db = drizzle(pool)
 
 	// > Create a new refresh version and a new refresh date
-	const refreshVersion = uuidv4()
+	const refreshVersion = uuid()
 	const refreshDate = new Date()
+
+	// > Determine the state of the shouldRefresh flag
+	const shouldRefresh = false
 
 	// > Create a list of ignored files
 	const ignoredFiles = ["pages/404.mdx"]
 
-	const sources = await generateSources({ docsRootPath, ignoredFiles })
-	// .map((entry) => new MarkdownSource("markdown", entry.path, entry.parentPath))
+	// > Generate the markdown source files
+	const sourceFiles = await generateSources({ docsRootPath, ignoredFiles })
 
-	// const sources = await Promise.all(
-	// 	markdownFiles.map(async ({ path, parentPath }) => {
-	// 		const { filePath, parentFilePath, source, type } = new MarkdownSource("markdown", path, parentPath)
-	// 		const { checksum, meta, sections } = await source.load()
-	// 		return { path: filePath, checksum: checksum, type: type, source: source, meta: meta, parent_page_path: parentFilePath, sections: sections }
-	// 	}),
-	// )
-
-	// > Log the number of pages discovered
-	// console.log(`Discovered ${sources.length} pages.`)
+	// > If the shouldRefresh flag is true, delete all existing documents and document sections
+	if (shouldRefresh) {
+		// >> Delete all existing documents from the database
+		const [deletedDocuments] = await db.delete(documents).returning()
+		// >> Delete all existing document sections from the database
+		const [deletedDocumentSections] = await db.delete(documentSections).returning()
+		// >> Iterate over all source files and insert new documents and document sections
+		for (const currentSourceFile of sourceFiles) {
+			// >>> Insert the document into the database
+			// prettier-ignore
+			const [newDocument] = await db.insert(documents).values({ ...currentSourceFile, id: uuid() }).returning() as DocumentType[]
+			// >>> Iterate over all sections of the document and insert them into the database
+			for (const section of currentSourceFile.sections) {
+				// >>>> Process the content of the section to optimize the token count for the embedding
+				const input = section.content.replace(/\n/g, " ")
+				// >>>> Generate an embedding for the content of the section
+				const { value, embedding, usage } = await embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input })
+				// >>>> Insert the document section into the database
+				// prettier-ignore
+				const [newDocumentSections] = await db.insert(documentSections).values({ id: uuid(), page_id: newDocument.id, heading: section.heading, slug: section.slug, content: section.content || value, embedding: embedding, token_count: usage.tokens }).returning() as DocumentSectionType[]
+			}
+		}
+	}
 
 	// > Process each source file and generate embeddings
-	for (const source of sources) {
+	for (const currentSourceFile of sourceFiles) {
 		try {
-			const [existingPage] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
+			// > Try to find the current document in the database by its path
+			// const [foundDocument] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
+			// prettier-ignore
+			const [foundDocument] = await db.select({ id: documents.id, path: documents.path, meta: documents.meta, checksum: documents.checksum, parentPage: { id: documents.id, path: documents.path } }).from(documents).where(eq(documents.path, currentSourceFile.path)).limit(1)
 
-			const newId: string = uuidv4()
+			// > Check if the document exists and if the checksum has changed
+			const isDocumentChanged = Boolean(foundDocument) && foundDocument.checksum !== currentSourceFile.checksum
 
-			const pageData = {
-				path: source.path,
-				checksum: source.checksum,
-				parent_id: null, // Handle parent page logic if applicable
-				meta: source.meta,
+			// >> If the checksum has not changed, skip the document
+			if (!isDocumentChanged) {
+				console.log(`No changes detected for ${currentSourceFile.path}`)
+				continue
+			}
+
+			// >> If the checksum has changed, update the document, delete any existing document sections, and insert new embeddings for the document sections
+			if (isDocumentChanged) {
+				// >>> Update the existing document
+				// prettier-ignore
+				const [updatedDocuments]: DocumentType[] = await db.update(documents).set({ path: currentSourceFile.path }).where(eq(documents.id, foundDocument.id)).returning()
+
+				// >>> Delete the existing document sections associated with the document's ID
+				const [deletedDocumentSections]: DocumentSectionType[] = await db.delete(documentSections).where(eq(documentSections.page_id, foundDocument.id)).returning()
+
+				// >>> Insert new document sections
+				for (const { heading, slug, content } of currentSourceFile.sections) {
+					// >>>> Process the content of the section to optimize the token count for the embedding
+					const input = content.replace(/\n/g, " ")
+
+					// >>>> Generate an embedding for the content of the section
+					const { value, embedding, usage } = await embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input })
+
+					// >>>> Insert the document section into the database
+					// prettier-ignore
+					const [newDocumentSections] = await db.insert(documentSections).values({ id: uuid(), page_id: foundDocument.id, heading: heading, slug: slug, content: content || value, embedding: embedding, token_count: usage.tokens }).returning()
+				}
+			}
+
+			// >
+			const newId: string = uuid()
+
+			const documentData = {
+				path: currentSourceFile.path,
+				checksum: currentSourceFile.checksum,
+				parent_id: foundDocument?.parentPage?.id || null,
+				parent_page_path: currentSourceFile.parent_page_path,
+				meta: currentSourceFile.meta,
 				version: refreshVersion,
 				last_refresh: refreshDate,
 			}
 
-			if (existingPage) {
-				if (existingPage.checksum === source.checksum) {
-					console.log(`No changes detected for ${source.path}`)
+			if (foundDocument) {
+				if (foundDocument.checksum === currentSourceFile.checksum) {
+					console.log(`No changes detected for ${currentSourceFile.path}`)
 					continue
 				}
 				// Update existing page
-				await db.update(documents).set(pageData).where(eq(documents.id, existingPage.id)).returning()
+				await db.update(documents).set(documentData).where(eq(documents.id, foundDocument.id)).returning()
 				// Delete existing sections
-				await db.delete(documentSections).where(eq(documentSections.page_id, existingPage.id)).returning()
+				await db.delete(documentSections).where(eq(documentSections.page_id, foundDocument.id)).returning()
 			} else {
 				// Insert new page
-				await db.insert(documents).values({ ...pageData, id: newId })
-				// const newPage: Page = (await db.insert(documents).values({ ...pageData, id: newId }).returning())[0]
-				// existingPageId = newPage.id
+				await db.insert(documents).values({ ...documentData, id: newId })
+				// const newPage: Page = (await db.insert(documents).values({ ...documentData, id: newId }).returning())[0]
+				// foundDocumentId = newPage.id
 			}
 
-			console.log(`Processing ${source.path}`)
+			console.log(`Processing ${currentSourceFile.path}`)
 
 			// Generate embeddings
-			const { sections } = source
+			const { sections } = currentSourceFile
 
 			for (const section of sections) {
 				// Assign the content to a constant
@@ -151,8 +207,8 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 
 				// Insert the section into the database
 				await db.insert(documentSections).values({
-					id: uuidv4(),
-					page_id: existingPage?.id || newId,
+					id: uuid(),
+					page_id: foundDocument?.id || newId,
 					heading: section.heading,
 					slug: section.slug,
 					content: section.content || value,
@@ -161,7 +217,7 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 				})
 			}
 		} catch (error) {
-			console.error(`Error processing ${source.path}:`, error)
+			console.error(`Error processing ${currentSourceFile.path}:`, error)
 		}
 	}
 

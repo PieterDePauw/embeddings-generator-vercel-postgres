@@ -94550,14 +94550,14 @@ class MarkdownSource extends BaseSource {
 
 // Define a table for pages
 // prettier-ignore
-const pages = pgTable("pages", {
+const documents = pgTable("documents", {
     id: varchar("id").primaryKey(),
     path: text_text("path").notNull().unique(),
     checksum: text_text("checksum"),
     type: text_text("type"),
     source: text_text("source"),
     meta: text_text("meta"),
-    parent_page_path: text_text("parent_page_path").references(() => pages.path),
+    parent_page_path: text_text("parent_page_path").references(() => documents.path),
     version: varchar("version"),
     last_refresh: timestamp("last_refresh").defaultNow(),
     created_at: timestamp("created_at").notNull().defaultNow(),
@@ -94565,9 +94565,9 @@ const pages = pgTable("pages", {
 });
 // Define a table for page sections
 // prettier-ignore
-const pageSections = pgTable("page_sections", {
+const documentSections = pgTable("document_sections", {
     id: varchar("id").primaryKey(),
-    page_id: varchar("page_id").references(() => pages.id).notNull(),
+    page_id: varchar("page_id").references(() => documents.id).notNull(),
     slug: text_text("slug").notNull(),
     heading: text_text("heading").notNull(),
     content: text_text("content").notNull(),
@@ -94603,14 +94603,14 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 // Define the generateSources function
 function generateSources(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }) {
-        // Walk through the docs root path
+        // > Walk through the docs root path
         const embeddingSources = yield Promise.all((yield walk(docsRootPath))
             .filter(({ path }) => /\.mdx?$/.test(path))
             .filter(({ path }) => !ignoredFiles.includes(path))
             .map(({ path, parentPath }) => generateMarkdownSource(path, parentPath)));
-        // Log the number of discovered pages
+        // > Log the number of discovered pages
         console.log(`Discovered ${embeddingSources.length} pages`);
-        // Return the embedding sources
+        // > Return the embedding sources
         return embeddingSources;
     });
 }
@@ -94622,20 +94622,21 @@ function generateSources(_a) {
  */
 function generateMarkdownSource(filePath, parentFilePath) {
     return main_awaiter(this, void 0, void 0, function* () {
-        // Extract the path and parent path
+        // > Extract the path and parent path
         // const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
         // const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
-        // Read the file contents asynchronously
+        // > Read the file contents asynchronously
         const contents = yield (0,promises_namespaceObject.readFile)(filePath, "utf8");
-        // Process the contents of the MDX file for search and extract the checksum, meta, and sections
+        // > Process the contents of the MDX file for search and extract the checksum, meta, and sections
         const { checksum, meta, sections } = processMdxForSearch(contents);
-        // Return the desired object
+        // > Return the desired object
         return { path: filePath, checksum: checksum, type: "markdown", source: "markdown", meta: meta, parent_page_path: parentFilePath, sections: sections };
     });
 }
 // Main function to generate embeddings
 function generateEmbeddings(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath }) {
+        var _b;
         // > Initialize OpenAI client
         const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
         // > Create a connection pool to the database
@@ -94645,60 +94646,106 @@ function generateEmbeddings(_a) {
         // > Create a new refresh version and a new refresh date
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
+        // > Determine the state of the shouldRefresh flag
+        const shouldRefresh = false;
         // > Create a list of ignored files
         const ignoredFiles = ["pages/404.mdx"];
-        const sources = yield generateSources({ docsRootPath, ignoredFiles });
-        // .map((entry) => new MarkdownSource("markdown", entry.path, entry.parentPath))
-        // const sources = await Promise.all(
-        // 	markdownFiles.map(async ({ path, parentPath }) => {
-        // 		const { filePath, parentFilePath, source, type } = new MarkdownSource("markdown", path, parentPath)
-        // 		const { checksum, meta, sections } = await source.load()
-        // 		return { path: filePath, checksum: checksum, type: type, source: source, meta: meta, parent_page_path: parentFilePath, sections: sections }
-        // 	}),
-        // )
-        // > Log the number of pages discovered
-        // console.log(`Discovered ${sources.length} pages.`)
+        // > Generate the markdown source files
+        const sourceFiles = yield generateSources({ docsRootPath, ignoredFiles });
+        // > If the shouldRefresh flag is true, delete all existing documents and document sections
+        if (shouldRefresh) {
+            // >> Delete all existing documents from the database
+            const [deletedDocuments] = yield db.delete(documents).returning();
+            // >> Delete all existing document sections from the database
+            const [deletedDocumentSections] = yield db.delete(documentSections).returning();
+            // >> Iterate over all source files and insert new documents and document sections
+            for (const currentSourceFile of sourceFiles) {
+                // >>> Insert the document into the database
+                // prettier-ignore
+                const [newDocument] = yield db.insert(documents).values(Object.assign(Object.assign({}, currentSourceFile), { id: esm_v4() })).returning();
+                // >>> Iterate over all sections of the document and insert them into the database
+                for (const section of currentSourceFile.sections) {
+                    // >>>> Process the content of the section to optimize the token count for the embedding
+                    const input = section.content.replace(/\n/g, " ");
+                    // >>>> Generate an embedding for the content of the section
+                    const { value, embedding, usage } = yield dist_embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input });
+                    // >>>> Insert the document section into the database
+                    // prettier-ignore
+                    const [newDocumentSections] = yield db.insert(documentSections).values({ id: esm_v4(), page_id: newDocument.id, heading: section.heading, slug: section.slug, content: section.content || value, embedding: embedding, token_count: usage.tokens }).returning();
+                }
+            }
+        }
         // > Process each source file and generate embeddings
-        for (const source of sources) {
+        for (const currentSourceFile of sourceFiles) {
             try {
-                const [existingPage] = yield db.select().from(pages).where(eq(pages.path, source.path)).limit(1);
+                // > Try to find the current document in the database by its path
+                // const [foundDocument] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
+                // prettier-ignore
+                const [foundDocument] = yield db.select({ id: documents.id, path: documents.path, meta: documents.meta, checksum: documents.checksum, parentPage: { id: documents.id, path: documents.path } }).from(documents).where(eq(documents.path, currentSourceFile.path)).limit(1);
+                // > Check if the document exists and if the checksum has changed
+                const isDocumentChanged = Boolean(foundDocument) && foundDocument.checksum !== currentSourceFile.checksum;
+                // >> If the checksum has not changed, skip the document
+                if (!isDocumentChanged) {
+                    console.log(`No changes detected for ${currentSourceFile.path}`);
+                    continue;
+                }
+                // >> If the checksum has changed, update the document, delete any existing document sections, and insert new embeddings for the document sections
+                if (isDocumentChanged) {
+                    // >>> Update the existing document
+                    // prettier-ignore
+                    const [updatedDocuments] = yield db.update(documents).set({ path: currentSourceFile.path }).where(eq(documents.id, foundDocument.id)).returning();
+                    // >>> Delete the existing document sections associated with the document's ID
+                    const [deletedDocumentSections] = yield db.delete(documentSections).where(eq(documentSections.page_id, foundDocument.id)).returning();
+                    // >>> Insert new document sections
+                    for (const { heading, slug, content } of currentSourceFile.sections) {
+                        // >>>> Process the content of the section to optimize the token count for the embedding
+                        const input = content.replace(/\n/g, " ");
+                        // >>>> Generate an embedding for the content of the section
+                        const { value, embedding, usage } = yield dist_embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input });
+                        // >>>> Insert the document section into the database
+                        // prettier-ignore
+                        const [newDocumentSections] = yield db.insert(documentSections).values({ id: esm_v4(), page_id: foundDocument.id, heading: heading, slug: slug, content: content || value, embedding: embedding, token_count: usage.tokens }).returning();
+                    }
+                }
+                // >
                 const newId = esm_v4();
-                const pageData = {
-                    path: source.path,
-                    checksum: source.checksum,
-                    parent_id: null, // Handle parent page logic if applicable
-                    meta: source.meta,
+                const documentData = {
+                    path: currentSourceFile.path,
+                    checksum: currentSourceFile.checksum,
+                    parent_id: ((_b = foundDocument === null || foundDocument === void 0 ? void 0 : foundDocument.parentPage) === null || _b === void 0 ? void 0 : _b.id) || null,
+                    parent_page_path: currentSourceFile.parent_page_path,
+                    meta: currentSourceFile.meta,
                     version: refreshVersion,
                     last_refresh: refreshDate,
                 };
-                if (existingPage) {
-                    if (existingPage.checksum === source.checksum) {
-                        console.log(`No changes detected for ${source.path}`);
+                if (foundDocument) {
+                    if (foundDocument.checksum === currentSourceFile.checksum) {
+                        console.log(`No changes detected for ${currentSourceFile.path}`);
                         continue;
                     }
                     // Update existing page
-                    yield db.update(pages).set(pageData).where(eq(pages.id, existingPage.id)).returning();
+                    yield db.update(documents).set(documentData).where(eq(documents.id, foundDocument.id)).returning();
                     // Delete existing sections
-                    yield db.delete(pageSections).where(eq(pageSections.page_id, existingPage.id)).returning();
+                    yield db.delete(documentSections).where(eq(documentSections.page_id, foundDocument.id)).returning();
                 }
                 else {
                     // Insert new page
-                    yield db.insert(pages).values(Object.assign(Object.assign({}, pageData), { id: newId }));
-                    // const newPage: Page = (await db.insert(documents).values({ ...pageData, id: newId }).returning())[0]
-                    // existingPageId = newPage.id
+                    yield db.insert(documents).values(Object.assign(Object.assign({}, documentData), { id: newId }));
+                    // const newPage: Page = (await db.insert(documents).values({ ...documentData, id: newId }).returning())[0]
+                    // foundDocumentId = newPage.id
                 }
-                console.log(`Processing ${source.path}`);
+                console.log(`Processing ${currentSourceFile.path}`);
                 // Generate embeddings
-                const { sections } = source;
+                const { sections } = currentSourceFile;
                 for (const section of sections) {
                     // Assign the content to a constant
                     const input = section.content.replace(/\n/g, " ");
                     // Embed the content of the section
                     const { value, embedding, usage } = yield dist_embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input });
                     // Insert the section into the database
-                    yield db.insert(pageSections).values({
+                    yield db.insert(documentSections).values({
                         id: esm_v4(),
-                        page_id: (existingPage === null || existingPage === void 0 ? void 0 : existingPage.id) || newId,
+                        page_id: (foundDocument === null || foundDocument === void 0 ? void 0 : foundDocument.id) || newId,
                         heading: section.heading,
                         slug: section.slug,
                         content: section.content || value,
@@ -94708,11 +94755,11 @@ function generateEmbeddings(_a) {
                 }
             }
             catch (error) {
-                console.error(`Error processing ${source.path}:`, error);
+                console.error(`Error processing ${currentSourceFile.path}:`, error);
             }
         }
         // Cleanup old pages
-        yield db.delete(pages).where(ne(pages.version, refreshVersion));
+        yield db.delete(documents).where(ne(documents.version, refreshVersion));
         console.log("Embedding generation complete.");
     });
 }
