@@ -1,11 +1,11 @@
 {
-  "id": "b364bea2-61a7-48a3-ac58-9035c0e7a965",
-  "prevId": "319cdae4-f3c0-475a-bc01-885b2ab31d15",
+  "id": "3c0c3eb4-5d07-4a5e-9ae1-7fcf890a89a8",
+  "prevId": "4e3f2252-110a-4c91-ac87-97df4f891638",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.page_sections": {
-      "name": "page_sections",
+    "public.document_sections": {
+      "name": "document_sections",
       "schema": "",
       "columns": {
         "id": {
@@ -14,8 +14,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "page_id": {
-          "name": "page_id",
+        "document_id": {
+          "name": "document_id",
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
@@ -53,12 +53,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "page_sections_page_id_pages_id_fk": {
-          "name": "page_sections_page_id_pages_id_fk",
-          "tableFrom": "page_sections",
-          "tableTo": "pages",
+        "document_sections_document_id_documents_id_fk": {
+          "name": "document_sections_document_id_documents_id_fk",
+          "tableFrom": "document_sections",
+          "tableTo": "documents",
           "columnsFrom": [
-            "page_id"
+            "document_id"
           ],
           "columnsTo": [
             "id"
@@ -73,8 +73,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.pages": {
-      "name": "pages",
+    "public.documents": {
+      "name": "documents",
       "schema": "",
       "columns": {
         "id": {
@@ -113,8 +113,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "parent_page_path": {
-          "name": "parent_page_path",
+        "parent_document_path": {
+          "name": "parent_document_path",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -148,12 +148,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "pages_parent_page_path_pages_path_fk": {
-          "name": "pages_parent_page_path_pages_path_fk",
-          "tableFrom": "pages",
-          "tableTo": "pages",
+        "documents_parent_document_path_documents_path_fk": {
+          "name": "documents_parent_document_path_documents_path_fk",
+          "tableFrom": "documents",
+          "tableTo": "documents",
           "columnsFrom": [
-            "parent_page_path"
+            "parent_document_path"
           ],
           "columnsTo": [
             "path"
@@ -164,8 +164,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "pages_path_unique": {
-          "name": "pages_path_unique",
+        "documents_path_unique": {
+          "name": "documents_path_unique",
           "nullsNotDistinct": false,
           "columns": [
             "path"
