@@ -42587,6 +42587,13 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
 (() => {
 "use strict";
+// ESM COMPAT FLAG
+__nccwpck_require__.r(__webpack_exports__);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  generateMarkdownSource: () => (/* binding */ generateMarkdownSource)
+});
 
 // NAMESPACE OBJECT: ./node_modules/micromark/lib/constructs.js
 var constructs_namespaceObject = {};
@@ -42605,6 +42612,8 @@ __nccwpck_require__.d(constructs_namespaceObject, {
 
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(7484);
+;// CONCATENATED MODULE: external "fs/promises"
+const promises_namespaceObject = require("fs/promises");
 ;// CONCATENATED MODULE: ./node_modules/drizzle-orm/entity.js
 const entityKind = Symbol.for("drizzle:entityKind");
 const hasOwnEntityKind = Symbol.for("drizzle:hasOwnEntityKind");
@@ -66920,8 +66929,6 @@ function v4(options, buf, offset) {
 }
 /* harmony default export */ const esm_v4 = (v4);
 
-;// CONCATENATED MODULE: external "fs/promises"
-const promises_namespaceObject = require("fs/promises");
 // EXTERNAL MODULE: external "path"
 var external_path_ = __nccwpck_require__(6928);
 ;// CONCATENATED MODULE: ./src/sources/util.ts
@@ -94343,34 +94350,22 @@ var markdown_awaiter = (undefined && undefined.__awaiter) || function (thisArg, 
 
 
 /**
- * * Abstract base class representing a source of data.
- */
-class BaseSource {
-    constructor(source, path, parentPath) {
-        this.source = source;
-        this.path = path;
-        this.parentPath = parentPath;
-    }
-}
-/**
  * Extracts ES literals from an `estree` `ObjectExpression`
  * into a plain JavaScript object.
  */
 function getObjectFromExpression(node) {
     // > Reduce the properties of the object expression into a plain object
     return node.properties.reduce((object, property) => {
-        // >> Skip non-property nodes
-        if (property.type !== "Property") {
+        // >> If the type of the property is not "Property", return the object as is
+        if (property.type !== "Property")
             return object;
-        }
         // >> Extract the key and value of the property
         const key = (property.key.type === "Identifier" && property.key.name) || undefined;
         const value = (property.value.type === "Literal" && property.value.value) || undefined;
         // >> If the key is not a truthy value, return the object as is
-        if (!key) {
+        if (!key)
             return object;
-        }
-        // >> Return the object with the key-value pair
+        // >> If the key is a truthy value, return the object with the key-value pair appended to it
         return Object.assign(Object.assign({}, object), { [key]: value });
     }, {});
 }
@@ -94443,11 +94438,14 @@ function splitTreeBy(tree, predicate) {
  * ```
  */
 function parseHeading(heading) {
+    // > Match the heading against a regular expression
     const match = heading.match(/(.*) *\[#(.*)\]/);
+    // > If there's a match, return the heading and the custom anchor
     if (match) {
         const [, heading, customAnchor] = match;
         return { heading: heading, customAnchor: customAnchor };
     }
+    // > If there's no match, return just the heading
     return { heading: heading };
 }
 /**
@@ -94476,28 +94474,52 @@ function processMdxForSearch(content) {
     // > Filter out JSX nodes from the MDX tree (so we only have markdown nodes)
     const mdTree = filter(mdxTree, (node) => !["mdxjsEsm", "mdxJsxFlowElement", "mdxJsxTextElement", "mdxFlowExpression", "mdxTextExpression"].includes(node.type));
     // > If there's no markdown tree, return an empty object
-    if (!mdTree) {
+    if (!mdTree)
         return { checksum: checksum, meta: serializableMeta, sections: [] };
-    }
     // > Split the markdown tree into sections based on headings
     const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading");
-    // > Create a slugger to generate slugs for headings
-    // const slugger = new GithubSlugger()
-    const sections = sectionTrees.map((tree) => {
-        const [firstNode] = tree.children;
-        const content = toMarkdown(tree);
+    // > Generate sections from the section trees by extracting the heading and content of each section
+    const sections = sectionTrees.map((sectionTree) => {
+        // >> Get the first node of the section tree
+        const [firstNode] = sectionTree.children;
+        // >> Convert the section tree to markdown to get the content
+        const content = toMarkdown(sectionTree);
+        // >> Check if the first node has a type property set to "heading"
         const rawHeading = firstNode.type === "heading" ? lib_toString(firstNode) : undefined;
-        if (!rawHeading) {
+        // >> If it isn't a heading, just return the content
+        if (!rawHeading)
             return { content: content };
-        }
+        // >> If it is a heading, parse the raw heading to extract the heading and possibly a custom anchor
         const { heading, customAnchor } = parseHeading(rawHeading);
-        // const slug = slugger.slug(customAnchor ?? heading)
-        const slug = generateSlug({ heading: heading, customAnchor: customAnchor });
-        return { content, heading, slug };
+        // >> After parsing the heading, generate a slug from the heading or the custom anchor
+        const slug = generateSlug({ heading, customAnchor });
+        // >> Return the content, heading, and slug
+        return { content: content, heading: heading, slug: slug };
     });
+    // > Return the checksum, the metadata, and the sections
     return { checksum: checksum, meta: serializableMeta, sections: sections };
 }
+/**
+ * * Abstract base class representing a source of data.
+ */
+class BaseSource {
+    constructor(source, path, parentPath) {
+        this.source = source;
+        this.path = path;
+        this.parentPath = parentPath;
+    }
+}
+/**
+ * Represents a source of markdown content.
+ * Extends the BaseSource class to handle markdown-specific operations.
+ */
 class MarkdownSource extends BaseSource {
+    /**
+     * Creates an instance of MarkdownSource.
+     * @param source - The source content as a string.
+     * @param filePath - The file path to the markdown file.
+     * @param parentFilePath - The optional file path to the parent markdown file.
+     */
     constructor(source, filePath, parentFilePath) {
         const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
         const parentPath = parentFilePath === null || parentFilePath === void 0 ? void 0 : parentFilePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
@@ -94506,6 +94528,11 @@ class MarkdownSource extends BaseSource {
         this.parentFilePath = parentFilePath;
         this.type = "markdown";
     }
+    /**
+     * Loads the markdown content from the file, processes it for search,
+     * and sets the checksum, meta, and sections properties.
+     * @returns An object containing the checksum, meta, and sections of the markdown content.
+     */
     load() {
         return markdown_awaiter(this, void 0, void 0, function* () {
             const contents = yield (0,promises_namespaceObject.readFile)(this.filePath, "utf8");
@@ -94572,24 +94599,53 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 
 
 
-// interface Page {
-// 	id: string
-// 	path: string
-// 	checksum: string | null
-// 	parent_id: string | null
-// 	meta: Record<string, any> | null
-// 	version: string
-// 	last_refresh: Date
-// }
-// interface PageSection {
-// 	id: string
-// 	page_id: string
-// 	heading: string | null
-// 	slug: string | null
-// 	content: string
-// 	embedding: number[]
-// 	token_count: number
-// }
+
+// Define the generateSources function
+function generateSources(_a) {
+    return main_awaiter(this, arguments, void 0, function* ({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }) {
+        // Walk through the docs root path
+        const embeddingSourcePromises = (yield walk(docsRootPath))
+            .filter(({ path }) => /\.mdx?$/.test(path))
+            .filter(({ path }) => !ignoredFiles.includes(path))
+            .map((entry) => generateMarkdownSource(entry.path, entry.parentPath));
+        // Await all promises to get the actual embedding sources
+        const embeddingSources = yield Promise.all(embeddingSourcePromises);
+        // Log the number of discovered pages
+        console.log(`Discovered ${embeddingSources.length} pages`);
+        // Return the embedding sources
+        return embeddingSources;
+    });
+}
+/**
+ * Asynchronously creates a markdown source object by reading and processing a markdown file.
+ * @param filePath - The file path to the markdown file.
+ * @param parentFilePath - The optional file path to the parent markdown file.
+ * @returns An object containing the path, checksum, type, source, meta, parent page path, and sections.
+ */
+function generateMarkdownSource(filePath, parentFilePath) {
+    return main_awaiter(this, void 0, void 0, function* () {
+        // Extract the path and parent path
+        const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
+        const parentPath = parentFilePath === null || parentFilePath === void 0 ? void 0 : parentFilePath.replace(/^pages/, "").replace(/\.mdx?$/, "");
+        // Define the source and type
+        const source = "markdown";
+        const type = "markdown";
+        // Read the file contents asynchronously
+        const contents = yield (0,promises_namespaceObject.readFile)(filePath, "utf8");
+        // Process the contents of the MDX file for search and extract the checksum, meta, and sections
+        const { checksum, meta, sections } = processMdxForSearch(contents);
+        // Return the desired object
+        return {
+            path: filePath,
+            checksum: checksum,
+            type: type,
+            source: source,
+            meta: meta,
+            parent_page_path: parentFilePath,
+            sections: sections,
+        };
+    });
+}
 // Main function to generate embeddings
 function generateEmbeddings(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath }) {
@@ -94604,14 +94660,17 @@ function generateEmbeddings(_a) {
         const refreshDate = new Date();
         // > Create a list of ignored files
         const ignoredFiles = ["pages/404.mdx"];
-        const markdownFiles = (yield walk(docsRootPath)).filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path));
-        const sources = yield Promise.all(markdownFiles.map((_a) => main_awaiter(this, [_a], void 0, function* ({ path, parentPath }) {
-            const source = new MarkdownSource("markdown", path, parentPath);
-            const sourcePart2 = yield source.load();
-            return Object.assign(source, sourcePart2, {});
-        })));
+        const sources = yield generateSources({ docsRootPath, ignoredFiles });
+        // .map((entry) => new MarkdownSource("markdown", entry.path, entry.parentPath))
+        // const sources = await Promise.all(
+        // 	markdownFiles.map(async ({ path, parentPath }) => {
+        // 		const { filePath, parentFilePath, source, type } = new MarkdownSource("markdown", path, parentPath)
+        // 		const { checksum, meta, sections } = await source.load()
+        // 		return { path: filePath, checksum: checksum, type: type, source: source, meta: meta, parent_page_path: parentFilePath, sections: sections }
+        // 	}),
+        // )
         // > Log the number of pages discovered
-        console.log(`Discovered ${sources.length} pages.`);
+        // console.log(`Discovered ${sources.length} pages.`)
         // > Process each source file and generate embeddings
         for (const source of sources) {
             try {

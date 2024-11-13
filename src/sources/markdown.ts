@@ -20,7 +20,6 @@ import { filter } from "unist-util-filter"
  */
 export type Json = Record<string, string | number | boolean | null | Json[] | { [key: string]: Json }>
 export type Section = { content: string; heading?: string; slug?: string }
-export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_page_path?: string; sections: Section[] }
 
 /**
  * Extracts ES literals from an `estree` `ObjectExpression`

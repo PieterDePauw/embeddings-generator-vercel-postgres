@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 /* eslint-disable object-shorthand */
 import * as core from "@actions/core"
+import { readFile } from "fs/promises"
 import { eq, ne } from "drizzle-orm"
 import { createPool } from "@vercel/postgres"
 import { drizzle } from "drizzle-orm/vercel-postgres"
@@ -8,7 +9,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
 import { v4 as uuidv4 } from "uuid"
 import { walk } from "./sources/util"
-import { MarkdownSource, type MarkdownSourceType } from "./sources/markdown"
+import { processMdxForSearch, type Section, type Json } from "./sources/markdown"
 import { pages as documents, pageSections as documentSections, type InsertPageSection } from "./db/schema"
 
 // interface Page {
@@ -31,25 +32,57 @@ import { pages as documents, pageSections as documentSections, type InsertPageSe
 // 	token_count: number
 // }
 
-// Define the GenerateSourcesType
-type GenerateSourcesType = { docsRootPath: string; ignoredFiles: string[] }
+// Define the MarkdownSourceType
+export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_page_path?: string; sections: Section[] }
 
 // Define the generateSources function
-async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }: GenerateSourcesType): Promise<MarkdownSource[]> {
+async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }: { docsRootPath: string; ignoredFiles: string[] }): Promise<MarkdownSourceType[]> {
 	// Walk through the docs root path
-	const embeddingSources: MarkdownSourceType[] = (await walk(docsRootPath))
-		.filter(({ path }) => /\.mdx?$/.test(path))
-		.filter(({ path }) => !ignoredFiles.includes(path))
-		.map(async (entry) => await generateEmbeddings(entry.path, entry.parentPath))
-
-	// .map(Promise.all(({ path, parentPath }) => generateEmbeddings(path, parentPath)))
-	// .map((entry) => new MarkdownSource("markdown", entry.path))
+	const embeddingSources = await Promise.all(
+		(await walk(docsRootPath))
+			.filter(({ path }) => /\.mdx?$/.test(path))
+			.filter(({ path }) => !ignoredFiles.includes(path))
+			.map((entry) => generateMarkdownSource(entry.path, entry.parentPath)),
+	)
 
 	// Log the number of discovered pages
 	console.log(`Discovered ${embeddingSources.length} pages`)
 
 	// Return the embedding sources
 	return embeddingSources
+}
+
+/**
+ * Asynchronously creates a markdown source object by reading and processing a markdown file.
+ * @param filePath - The file path to the markdown file.
+ * @param parentFilePath - The optional file path to the parent markdown file.
+ * @returns An object containing the path, checksum, type, source, meta, parent page path, and sections.
+ */
+export async function generateMarkdownSource(filePath: string, parentFilePath?: string): Promise<MarkdownSourceType> {
+	// Extract the path and parent path
+	const path = filePath.replace(/^pages/, "").replace(/\.mdx?$/, "")
+	const parentPath = parentFilePath?.replace(/^pages/, "").replace(/\.mdx?$/, "")
+
+	// Define the source and type
+	const source = "markdown"
+	const type = "markdown"
+
+	// Read the file contents asynchronously
+	const contents = await readFile(filePath, "utf8")
+
+	// Process the contents of the MDX file for search and extract the checksum, meta, and sections
+	const { checksum, meta, sections } = processMdxForSearch(contents)
+
+	// Return the desired object
+	return {
+		path: filePath,
+		checksum: checksum,
+		type: type,
+		source: source,
+		meta: meta,
+		parent_page_path: parentFilePath,
+		sections: sections,
+	}
 }
 
 // Main function to generate embeddings
