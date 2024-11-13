@@ -141,7 +141,9 @@ export function generateSlug({ heading, customAnchor }: { heading: string; custo
 	// > Create a new slugger instance to generate slugs
 	const slugger = new GithubSlugger()
 	// > Create a slug from the heading or custom anchor and return it
-	return slugger.slug(customAnchor ?? heading)
+	const slug = slugger.slug(customAnchor ?? heading)
+	// > Return the slug or the heading without special characters and with all spaces replaced by hyphens
+	return slug || heading.replace(/[^a-zA-Z0-9 ]/g, "").replace(/ +/g, "-")
 }
 
 /**
