@@ -2,10 +2,10 @@
 /* eslint-disable no-shadow */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 
+import GithubSlugger from "github-slugger"
 import { readFile } from "fs/promises"
 import { createHash } from "crypto"
 import { ObjectExpression } from "estree"
-import GithubSlugger from "github-slugger"
 import { Content, Root } from "mdast"
 import { fromMarkdown } from "mdast-util-from-markdown"
 import { mdxFromMarkdown, type MdxjsEsm } from "mdast-util-mdx"
@@ -60,7 +60,10 @@ export function getObjectFromExpression(node: ObjectExpression) {
 		}
 
 		// >> Return the object with the key-value pair
-		return { ...object, [key]: value }
+		return {
+			...object,
+			[key]: value,
+		}
 	}, {})
 }
 
@@ -147,9 +150,19 @@ export function parseHeading(heading: string): { heading: string; customAnchor?:
 	const match = heading.match(/(.*) *\[#(.*)\]/)
 	if (match) {
 		const [, heading, customAnchor] = match
-		return { heading, customAnchor }
+		return { heading: heading, customAnchor: customAnchor }
 	}
-	return { heading }
+	return { heading: heading }
+}
+
+/**
+ * Generates a slug from a heading string or a custom anchor.
+ */
+export function generateSlug({ heading, customAnchor }: { heading: string; customAnchor?: string }): string {
+	// > Create a new slugger instance to generate slugs
+	const slugger = new GithubSlugger()
+	// > Create a slug from the heading or custom anchor and return it
+	return slugger.slug(customAnchor ?? heading)
 }
 
 /**
@@ -182,7 +195,7 @@ export function processMdxForSearch(content: string): { checksum: string; meta: 
 	const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading")
 
 	// > Create a slugger to generate slugs for headings
-	const slugger = new GithubSlugger()
+	// const slugger = new GithubSlugger()
 
 	const sections = sectionTrees.map((tree) => {
 		const [firstNode] = tree.children
@@ -191,17 +204,18 @@ export function processMdxForSearch(content: string): { checksum: string; meta: 
 		const rawHeading: string | undefined = firstNode.type === "heading" ? toString(firstNode) : undefined
 
 		if (!rawHeading) {
-			return { content }
+			return { content: content }
 		}
 
 		const { heading, customAnchor } = parseHeading(rawHeading)
 
-		const slug = slugger.slug(customAnchor ?? heading)
+		// const slug = slugger.slug(customAnchor ?? heading)
+		const slug = generateSlug({ heading: heading, customAnchor: customAnchor })
 
 		return { content, heading, slug }
 	})
 
-	return { checksum, meta: serializableMeta, sections }
+	return { checksum: checksum, meta: serializableMeta, sections: sections }
 }
 
 export class MarkdownSource extends BaseSource {
@@ -227,6 +241,6 @@ export class MarkdownSource extends BaseSource {
 		this.meta = meta
 		this.sections = sections
 
-		return { checksum, meta, sections }
+		return { checksum: checksum, meta: meta, sections: sections }
 	}
 }

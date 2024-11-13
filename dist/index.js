@@ -94446,9 +94446,18 @@ function parseHeading(heading) {
     const match = heading.match(/(.*) *\[#(.*)\]/);
     if (match) {
         const [, heading, customAnchor] = match;
-        return { heading, customAnchor };
+        return { heading: heading, customAnchor: customAnchor };
     }
-    return { heading };
+    return { heading: heading };
+}
+/**
+ * Generates a slug from a heading string or a custom anchor.
+ */
+function generateSlug({ heading, customAnchor }) {
+    // > Create a new slugger instance to generate slugs
+    const slugger = new BananaSlug();
+    // > Create a slug from the heading or custom anchor and return it
+    return slugger.slug(customAnchor !== null && customAnchor !== void 0 ? customAnchor : heading);
 }
 /**
  * Processes MDX content for search indexing.
@@ -94473,19 +94482,20 @@ function processMdxForSearch(content) {
     // > Split the markdown tree into sections based on headings
     const sectionTrees = splitTreeBy(mdTree, (node) => node.type === "heading");
     // > Create a slugger to generate slugs for headings
-    const slugger = new BananaSlug();
+    // const slugger = new GithubSlugger()
     const sections = sectionTrees.map((tree) => {
         const [firstNode] = tree.children;
         const content = toMarkdown(tree);
         const rawHeading = firstNode.type === "heading" ? lib_toString(firstNode) : undefined;
         if (!rawHeading) {
-            return { content };
+            return { content: content };
         }
         const { heading, customAnchor } = parseHeading(rawHeading);
-        const slug = slugger.slug(customAnchor !== null && customAnchor !== void 0 ? customAnchor : heading);
+        // const slug = slugger.slug(customAnchor ?? heading)
+        const slug = generateSlug({ heading: heading, customAnchor: customAnchor });
         return { content, heading, slug };
     });
-    return { checksum, meta: serializableMeta, sections };
+    return { checksum: checksum, meta: serializableMeta, sections: sections };
 }
 class MarkdownSource extends BaseSource {
     constructor(source, filePath, parentFilePath) {
@@ -94503,7 +94513,7 @@ class MarkdownSource extends BaseSource {
             this.checksum = checksum;
             this.meta = meta;
             this.sections = sections;
-            return { checksum, meta, sections };
+            return { checksum: checksum, meta: meta, sections: sections };
         });
     }
 }
