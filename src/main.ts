@@ -10,7 +10,7 @@ import { embed } from "ai"
 import { v4 as uuid } from "uuid"
 import { walk } from "./sources/util"
 import { processMdxForSearch, type Section, type Json } from "./sources/markdown"
-import { documents, documentSections, type DocumentType, type DocumentSectionType, type InsertDocumentType } from "./db/schema"
+import { documents, documentSections, type DocumentType, type DocumentSectionType } from "./db/schema"
 
 // Define the MarkdownSourceType
 export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_document_path: string | null; sections: Section[] }

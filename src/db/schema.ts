@@ -38,6 +38,3 @@ export type InsertDocumentType = typeof documents.$inferInsert
 export type DocumentSectionType = typeof documentSections.$inferSelect
 export type SelectDocumentSectionType = typeof documentSections.$inferSelect
 export type InsertDocumentSectionType = typeof documentSections.$inferInsert
-
-// Export schema type
-// export type DbSchema = typeof pages & typeof pageSections

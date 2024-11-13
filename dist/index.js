@@ -94576,8 +94576,6 @@ const documentSections = pgTable("document_sections", {
     token_count: integer("token_count").notNull(),
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
 });
-// Export schema type
-// export type DbSchema = typeof pages & typeof pageSections
 
 ;// CONCATENATED MODULE: ./src/main.ts
 var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
@@ -94636,8 +94634,9 @@ function generateMarkdownSource(filePath, parentFilePath) {
     });
 }
 // Main function to generate embeddings
+// prettier-ignore
 function generateEmbeddings(_a) {
-    return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath }) {
+    return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath, shouldRefresh }) {
         var _b;
         // > Initialize OpenAI client
         const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
@@ -94648,8 +94647,6 @@ function generateEmbeddings(_a) {
         // > Create a new refresh version and a new refresh date
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
-        // > Determine the state of the shouldRefresh flag
-        const shouldRefresh = false;
         // > Create a list of ignored files
         const ignoredFiles = ["pages/404.mdx"];
         // > Generate the markdown source files
@@ -94773,11 +94770,13 @@ function run() {
             const databaseUrl = core.getInput("database-url");
             const openaiApiKey = core.getInput("openai-api-key");
             const docsRootPath = core.getInput("docs-root-path") || "docs/";
+            // > Determine the state of the shouldRefresh flag
+            const shouldRefresh = false;
             // >> Check if the inputs are provided
             if (!databaseUrl || !openaiApiKey)
                 throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.");
             // >> Generate embeddings
-            yield generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath });
+            yield generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath, shouldRefresh: shouldRefresh });
         }
         catch (error) {
             // >> Log the error
