@@ -2,7 +2,7 @@
 /* eslint-disable object-shorthand */
 import * as core from "@actions/core"
 import { eq, ne } from "drizzle-orm"
-import { createClient } from "@vercel/postgres"
+import { createPool } from "@vercel/postgres"
 import { drizzle } from "drizzle-orm/vercel-postgres"
 import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
@@ -35,8 +35,18 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	// Initialize OpenAI client
 	const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" })
 
-	const client = createClient({ connectionString: databaseUrl })
-	const db = drizzle(client)
+	// const client = createClient({ connectionString: databaseUrl })
+	// const db = drizzle(client)
+
+	// Create a connection pool to the database
+	const pool = createPool({
+		connectionString: databaseUrl,
+		ssl: { rejectUnauthorized: false },
+		max: 1,
+	})
+
+	// Create a Drizzle instance
+	const db = drizzle(pool)
 
 	const refreshVersion = uuidv4()
 	const refreshDate = new Date()

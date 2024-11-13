@@ -94576,8 +94576,10 @@ function generateEmbeddings(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ databaseUrl, openaiApiKey, docsRootPath }) {
         // Initialize OpenAI client
         const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" });
-        const client = createClient({ connectionString: databaseUrl });
-        const db = drizzle(client);
+        // const client = createClient({ connectionString: databaseUrl })
+        // const db = drizzle(client)
+        const pool = createPool({ connectionString: databaseUrl, max: 1, ssl: { rejectUnauthorized: false } });
+        const db = drizzle(pool);
         const refreshVersion = esm_v4();
         const refreshDate = new Date();
         const ignoredFiles = ["pages/404.mdx"];
@@ -94657,7 +94659,7 @@ function run() {
             const docsRootPath = core.getInput("docs-root-path") || "docs/";
             // Check if the inputs are provided
             if (!databaseUrl || !openaiApiKey) {
-                throw new Error("DATABASE_URL and OPENAI_API_KEY must be provided.");
+                throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.");
             }
             // Generate embeddings
             yield generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath });
