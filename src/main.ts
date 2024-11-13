@@ -11,27 +11,6 @@ import { v4 as uuid } from "uuid"
 import { walk } from "./sources/util"
 import { processMdxForSearch, type Section, type Json } from "./sources/markdown"
 import { documents, documentSections, type DocumentType, type DocumentSectionType, type InsertDocumentType } from "./db/schema"
-import { is } from "../dist/index"
-
-// interface Page {
-// 	id: string
-// 	path: string
-// 	checksum: string | null
-// 	parent_id: string | null
-// 	meta: Record<string, any> | null
-// 	version: string
-// 	last_refresh: Date
-// }
-
-// interface PageSection {
-// 	id: string
-// 	document_id: string
-// 	heading: string | null
-// 	slug: string | null
-// 	content: string
-// 	embedding: number[]
-// 	token_count: number
-// }
 
 // Define the MarkdownSourceType
 export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_document_path: string | null; sections: Section[] }
@@ -132,50 +111,51 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 		// >> Log the refresh operation to the console
 		console.log("Checking which documents have changed...")
 
-		// > Iterate over all source files and process each file to generate embeddings for the content of the sections of the document files that have changed
+		// >> Iterate over all source files and process each file to generate embeddings for the content of the sections of the document files that have changed
 		for (const currentSourceFile of sourceFiles) {
 			try {
-				// > Try to find the current document in the database by its path
+				// >>> Try to find the current document in the database by its path
 				// const [foundDocument] = await db.select().from(documents).where(eq(documents.path, source.path)).limit(1)
 				// prettier-ignore
 				const [foundDocument] = await db.select({ id: documents.id, path: documents.path, meta: documents.meta, checksum: documents.checksum, parentDocument: { id: documents.id, path: documents.path } }).from(documents).where(eq(documents.path, currentSourceFile.path)).limit(1)
 
-				// > If the document does not exist, create a new document
+				// >>> If the document does not exist, ...
 				// prettier-ignore
 				if (!foundDocument) {
-					// >>> Insert the document into the database
+					// >>>> Insert a new document into the database
 					// prettier-ignore
 					const [newDocument] = (await db.insert(documents).values({ ...currentSourceFile, id: uuid() }).returning()) as DocumentType[]
-					// >>> Iterate over all sections of the document and insert them into the database
+					// >>>> Iterate over all sections of the new document and insert them into the database
 					for (const section of currentSourceFile.sections) {
-						// >>>> Process the content of the section to optimize the token count for the embedding
+						// >>>>> Process the content of the section to optimize the token count for the embedding
 						const input = section.content.replace(/\n/g, " ")
-						// >>>> Generate an embedding for the content of the section
+						// >>>>> Generate an embedding for the content of the section
 						const { value, embedding, usage } = await embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input })
-						// >>>> Insert the document section into the database
+						// >>>>> Insert the document section into the database
 						// prettier-ignore
 						const [newDocumentSections] = (await db.insert(documentSections).values({ id: uuid(), document_id: newDocument.id, heading: section.heading, slug: section.slug, content: section.content || value, embedding: embedding, token_count: usage.tokens }).returning()) as DocumentSectionType[]
 					}
 				}
 
+				// >>> If the document exists, ...
 				if (foundDocument) {
-					// > Check if the checksum of the document has changed
+					// >>>> Check if the checksum of the document has changed
 					const isDocumentChanged = foundDocument.checksum !== currentSourceFile.checksum
 
-					// >> If the checksum has not changed, skip the document
+					// >>>> If the checksum has not changed, skip the document
 					if (!isDocumentChanged) {
-						// >>> Check if the parent document path has changed
+						// >>>>> Check if the parent document path has changed
 						const isParentPathChanged = foundDocument.parentDocument?.path !== currentSourceFile.parent_document_path
 
-						// >>> If the parent page path has not changed, skip the document
+						// >>>>> If the parent page path has not changed, skip the document
 						if (!isParentPathChanged) {
 							console.log(`No changes detected for ${currentSourceFile.path}`)
 							continue
 						}
 
-						// >>> If the parent page path has changed, update the parent page path of the document
+						// >>>>> If the parent page path has changed, update the parent page path of the document
 						if (isParentPathChanged) {
-							// >>> Find the parent document by the parent page path of the current source file
+							// >>>>>>> Find the parent document by the parent page path of the current source file
 							// prettier-ignore
 							const [parentDocument] = await db
 								.select()
@@ -183,42 +163,44 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 								.where(eq(documents.path, currentSourceFile.parent_document_path || ""))
 								.limit(1)
 
-							// >>> Update the parent page id and the parent page path of the document in the database
+							// >>>>> Update the parent page id and the parent page path of the document in the database
 							// await db.update(documents).set({ "parent_document_path": parentDocument?.path }).where(eq(documents.id, foundDocument.id))
 						}
 					}
 
-					// >> If the checksum has changed, update the document, delete any existing document sections, and insert new embeddings for the document sections
+					// >>>> If the checksum has changed, update the document, delete any existing document sections, and insert new embeddings for the document sections
 					if (isDocumentChanged) {
-						// >>> Update the existing document
+						// >>>>> Update the existing document
 						const [updatedDocuments]: DocumentType[] = await db.update(documents).set({ path: currentSourceFile.path }).where(eq(documents.id, foundDocument.id)).returning()
 
-						// >>> Delete the existing document sections associated with the document's ID
+						// >>>>> Delete the existing document sections associated with the document's ID
 						const [deletedDocumentSections]: DocumentSectionType[] = await db.delete(documentSections).where(eq(documentSections.document_id, foundDocument.id)).returning()
 
-						// >>> Insert new document sections
+						// >>>>> Insert new document sections
 						for (const { heading, slug, content } of currentSourceFile.sections) {
-							// >>>> Process the content of the section to optimize the token count for the embedding
+							// >>>>>> Process the content of the section to optimize the token count for the embedding
 							const input = content.replace(/\n/g, " ")
 
-							// >>>> Generate an embedding for the content of the section
+							// >>>>>> Generate an embedding for the content of the section
 							// prettier-ignore
 							const { value, embedding, usage } = await embed({ model: openaiClient.embedding("text-embedding-3-small", { dimensions: 1536, user: "drizzle" }), value: input })
 
-							// >>>> Insert the document section into the database
+							// >>>>>> Insert the document section into the database
 							// prettier-ignore
 							const [newDocumentSections] = await db.insert(documentSections).values({ id: uuid(), document_id: foundDocument.id, heading: heading, slug: slug, content: content || value, embedding: embedding, token_count: usage.tokens }).returning()
 						}
 					}
 				}
 			} catch (error) {
+				// >>> If an error occurs, log the error to the console
 				console.error(`Error processing ${currentSourceFile.path}:`, error)
 			}
 		}
 
-		// Cleanup old pages
+		// >> Cleanup old pages
 		await db.delete(documents).where(ne(documents.version, refreshVersion))
 
+		// >> Log the completion of the embedding generation process
 		console.log("Embedding generation complete.")
 	}
 }
@@ -226,20 +208,18 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 // Function to run the action
 async function run(): Promise<void> {
 	try {
-		// > Get the inputs
+		// >> Get the inputs
 		const databaseUrl: string | undefined = core.getInput("database-url")
 		const openaiApiKey: string | undefined = core.getInput("openai-api-key")
 		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
 
-		// > Check if the inputs are provided
-		if (!databaseUrl || !openaiApiKey) {
-			throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.")
-		}
+		// >> Check if the inputs are provided
+		if (!databaseUrl || !openaiApiKey) throw new Error("The inputs 'database-url' and 'openai-api-key' must be provided.")
 
-		// > Generate embeddings
+		// >> Generate embeddings
 		await generateEmbeddings({ databaseUrl: databaseUrl, openaiApiKey: openaiApiKey, docsRootPath: docsRootPath })
 	} catch (error) {
-		// > Log the error
+		// >> Log the error
 		core.setFailed(error.message)
 	}
 }
