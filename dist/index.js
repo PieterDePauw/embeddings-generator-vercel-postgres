@@ -94604,12 +94604,10 @@ var main_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arg
 function generateSources(_a) {
     return main_awaiter(this, arguments, void 0, function* ({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }) {
         // Walk through the docs root path
-        const embeddingSourcePromises = (yield walk(docsRootPath))
+        const embeddingSources = yield Promise.all((yield walk(docsRootPath))
             .filter(({ path }) => /\.mdx?$/.test(path))
             .filter(({ path }) => !ignoredFiles.includes(path))
-            .map((entry) => generateMarkdownSource(entry.path, entry.parentPath));
-        // Await all promises to get the actual embedding sources
-        const embeddingSources = yield Promise.all(embeddingSourcePromises);
+            .map((entry) => generateMarkdownSource(entry.path, entry.parentPath)));
         // Log the number of discovered pages
         console.log(`Discovered ${embeddingSources.length} pages`);
         // Return the embedding sources
