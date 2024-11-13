@@ -59,8 +59,8 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath }: {
 	const sources = await Promise.all(
 		markdownFiles.map(async ({ path, parentPath }) => {
 			const source = new MarkdownSource("markdown", path, parentPath)
-			await source.load()
-			return source
+			const sourcePart2 = await source.load()
+			return Object.assign(source, sourcePart2, {})
 		}),
 	)
 

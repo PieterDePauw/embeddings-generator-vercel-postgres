@@ -94593,8 +94593,8 @@ function generateEmbeddings(_a) {
         const markdownFiles = files.filter(({ path }) => /\.(md|mdx)$/.test(path)).filter(({ path }) => !ignoredFiles.includes(path));
         const sources = yield Promise.all(markdownFiles.map((_a) => main_awaiter(this, [_a], void 0, function* ({ path, parentPath }) {
             const source = new MarkdownSource("markdown", path, parentPath);
-            yield source.load();
-            return source;
+            const sourcePart2 = yield source.load();
+            return Object.assign(source, sourcePart2, {});
         })));
         console.log(`Discovered ${sources.length} pages.`);
         for (const source of sources) {
