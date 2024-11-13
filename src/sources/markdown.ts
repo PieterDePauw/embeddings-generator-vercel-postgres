@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 
 import GithubSlugger from "github-slugger"
-import { readFile, readDir, stat } from "fs/promises"
+import { readFile, readdir, stat } from "fs/promises"
 import { basename, dirname, join } from "path"
 import { createHash } from "crypto"
 import { ObjectExpression } from "estree"
@@ -30,7 +30,7 @@ export type Section = { content: string; heading?: string; slug?: string }
  */
 export async function walk(dir: string, parentPath?: string): Promise<{ path: string; parentPath?: string }[]> {
 	// > Read the contents of the directory
-	const immediateFiles = await readDir(dir)
+	const immediateFiles = await readdir(dir)
 
 	// > Recursively walk the directory and return all files in the directory and subdirectories
 	const recursiveFiles = await Promise.all(
