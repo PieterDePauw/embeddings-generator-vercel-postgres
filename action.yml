@@ -1,5 +1,5 @@
 name: "vercel-embeddings-action"
-description: "Generate embeddings from your Knowledge Base to use with Supabase Vector."
+description: "Generate embeddings from your knowledge base."
 author: "PieterDePauw"
 branding:
   icon: "umbrella"

@@ -1,5 +1,7 @@
 /* eslint-disable import/no-unresolved */
 /* eslint-disable no-shadow */
+/* eslint-disable no-console */
+/* eslint-disable object-shorthand */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 
 import GithubSlugger from "github-slugger"
@@ -28,16 +30,16 @@ export type Section = { content: string; heading?: string; slug?: string }
  * @param parentPath - The optional parent path for the next iteration.
  * @returns Promise that resolves to an array of objects containing the path and optional parent path.
  */
-export async function walk(dir: string, parentPath?: string): Promise<{ path: string; parentPath?: string }[]> {
+export async function walk(directory: string, parentPath?: string): Promise<{ path: string; parentPath?: string }[]> {
 	// > Read the contents of the directory
-	const immediateFiles = await readdir(dir)
+	const immediateFiles = await readdir(directory)
 
 	// > Recursively walk the directory and return all files in the directory and subdirectories
 	const recursiveFiles = await Promise.all(
 		// >> For each file in the directory, ...
 		immediateFiles.map(async (file) => {
 			// >>> Construct the full path to the file
-			const path = join(dir, file)
+			const path = join(directory, file)
 			// >>> Get the file stats
 			const stats = await stat(path)
 
@@ -59,6 +61,9 @@ export async function walk(dir: string, parentPath?: string): Promise<{ path: st
 			return []
 		}),
 	)
+
+	// > Log a message to the console indicating that the directory has been walked
+	console.log(`Walked all files in ${directory}: ${recursiveFiles.flat().length} files found`)
 
 	// > Return the flattened array of files sorted by path name
 	return recursiveFiles.reduce((all, folderContents) => all.concat(folderContents), []).sort((a, b) => a.path.localeCompare(b.path))
