@@ -10,10 +10,12 @@ generator client {
 }
 
 model File {
-  id       Int      @id @default(autoincrement())
-  filePath String   @unique
-  fileHash String
-  updatedAt DateTime @updatedAt @default(now())
+  id    Int      @id @default(autoincrement())
+  content   String
+  filePath  String  @unique
+  fileHash  String
+  lastVersion String
+  lastRefresh   DateTime @updatedAt @default(now())
 }
 
 model Embedding {
@@ -23,5 +25,7 @@ model Embedding {
   content    String
   embedding  String
   updatedAt  DateTime @updatedAt @default(now())
+  lastRefresh   DateTime @updatedAt @default(now())
+  lastVersion String
   @@unique([filePath, chunkIndex])
 }

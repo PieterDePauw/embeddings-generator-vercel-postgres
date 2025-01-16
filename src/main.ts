@@ -3,8 +3,7 @@
 import * as core from "@actions/core"
 import { readFile } from "fs/promises"
 import { eq, ne } from "drizzle-orm"
-import { createPool } from "@vercel/postgres"
-import { drizzle } from "drizzle-orm/vercel-postgres"
+import { drizzle } from "drizzle-orm/node-postgres"
 import { createOpenAI } from "@ai-sdk/openai"
 import { embed } from "ai"
 import { v4 as uuid } from "uuid"
@@ -61,11 +60,8 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath, sho
 	// > Initialize OpenAI client
 	const openaiClient = createOpenAI({ apiKey: openaiApiKey, compatibility: "strict" })
 
-	// > Create a connection pool to the database
-	const pool = createPool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 1 })
-
 	// > Create a Drizzle instance
-	const db = drizzle(pool)
+    const db = drizzle({ connection: { connectionString: databaseUrl, ssl: true } })
 
 	// > Create a new refresh version and a new refresh date
 	const refreshVersion = uuid()

@@ -174,10 +174,7 @@ export function parseHeading(heading: string): { heading: string; customAnchor?:
 	// > Match the heading against a regular expression
 	const match = heading.match(/(.*) *\[#(.*)\]/)
 	// > If there's a match, return the heading and the custom anchor
-	if (match) {
-		const [, heading, customAnchor] = match
-		return { heading: heading, customAnchor: customAnchor }
-	}
+	if (match) return { heading: match[1], customAnchor: match[2] }
 	// > If there's no match, return just the heading
 	return { heading: heading }
 }

@@ -19,6 +19,16 @@ const OPENAI_USER_ID = "user-id"
 const OPENAI_EMBEDDING_MODEL: EmbeddingModel = { name: "text-embedding-3-small", dimensions: 1536, pricing: 0.00002, maxRetries: 2 }
 const EMBEDDING_MODEL = openai.embedding(OPENAI_EMBEDDING_MODEL.name, { dimensions: OPENAI_EMBEDDING_MODEL.dimensions, user: OPENAI_USER_ID })
 
+// Initialize Prisma with the database URL from GitHub Secrets
+export function initializePrisma(): PrismaClient {
+	const databaseUrl = core.getInput("database-url")
+	if (!databaseUrl) throw new Error("Database URL is required to initialize Prisma.")
+	process.env.DATABASE_URL = databaseUrl
+	// Initialize PrismaClient with SSL configuration for cloud databases
+	const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } }, log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"] })
+	return prisma
+}
+
 /**
  * @name generateVersionInfo
  * @description Generates a new refresh version and timestamp for the document.
@@ -59,7 +69,7 @@ async function compareChecksum(filePath: string, hash: string): Promise<{ isFile
  */
 export async function embedSections(sections: Section[]): Promise<{ embeddings: number[][]; tokens: number; sections: Section[] }> {
 	const sectionsData: Section[] = sections.sort((a, b) => a.slug.localeCompare(b.slug))
-	const result = await embedMany({ values: sectionsData.map((section) => section.content), model: EMBEDDING_MODEL.name, maxRetries: EMBEDDING_MODEL.maxRetries })
+	const result = await embedMany({ values: sectionsData.map((section) => section.content), model: EMBEDDING_MODEL, maxRetries: OPENAI_EMBEDDING_MODEL.maxRetries })
 	return { embeddings: result.embeddings, tokens: result.usage.tokens, sections: sectionsData }
 }
 
@@ -78,7 +88,11 @@ async function run(): Promise<void> {
 		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
 
 		// > Get the input for whether to refresh all embeddings or only the ones that have changed
-		const shouldRefresh: boolean = core.getInput("should-refresh") === "true" || false
+		const shouldRefresh: boolean = false
+		// const shouldRefresh: boolean = core.getInput("should-refresh") === "true" || false
+
+		// >> Initialize Prisma with the database URL
+		const prisma = initializePrisma()
 
 		// 0. Get the latest commit hash that triggered the workflow and generate a new refresh version and timestamp for the document
 		const { refreshVersion, refreshDate } = generateVersionInfo()
@@ -104,18 +118,16 @@ async function run(): Promise<void> {
 				// > If the file was not found in the database or if the file was found and has changed, generate new embeddings for the file
 				if (!isFileFound || (isFileFound && isFileChanged)) {
 					// >> If the file was not found in the database, insert the file into the database
-					if (!isFileFound) {
-						await prisma.file.create({
-							data: {
-								content: markdownFile.content,
-								filePath: markdownFile.path,
-								fileHash: markdownFile.checksum,
-								latestRefresh: refreshDate,
-								latestVersion: refreshVersion,
-								tokens: 0,
-							},
-						})
-					}
+					await prisma.file.create({
+						data: {
+							content: markdownFile.content,
+							filePath: markdownFile.path,
+							fileHash: markdownFile.checksum,
+							latestRefresh: refreshDate,
+							latestVersion: refreshVersion,
+							tokens: 0,
+						},
+					})
 
 					// >> If the file has changed, delete existing embeddings for the file
 					if (isFileChanged) {
@@ -202,8 +214,8 @@ async function run(): Promise<void> {
 		// >> Log the error
 		core.setFailed(error.message)
 	} finally {
-        await prisma.$disconnect()  // ensures the process can exit cleanly
-      }
+		await prisma.$disconnect() // ensures the process can exit cleanly
+	}
 }
 
 // Run the action
