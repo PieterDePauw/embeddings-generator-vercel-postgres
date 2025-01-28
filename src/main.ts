@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 /* eslint-disable object-shorthand */
+import dotenv from "dotenv"
 import * as core from "@actions/core"
-import { readFile } from "fs/promises"
+import { readFile } from "node:fs/promises"
 import { eq, ne } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { createOpenAI } from "@ai-sdk/openai"
@@ -10,11 +11,14 @@ import { v4 as uuid } from "uuid"
 import { walk, processMdxForSearch, type Section, type Json } from "./sources/markdown"
 import { documents, documentSections, type DocumentType, type DocumentSectionType } from "./db/schema"
 
+// Load the environment variables
+dotenv.config({ path: ".env.local" })
+
 // Define the MarkdownSourceType
 export type MarkdownSourceType = { path: string; checksum: string; type: string; source: string; meta?: Json; parent_document_path: string | null; sections: Section[] }
 
 // Define the Singular type
-export type Singular<T> = T extends any[] ? undefined : T
+export type Singular<T> = T extends unknown[] ? undefined : T
 
 // Define the generateSources function
 async function generateSources({ docsRootPath, ignoredFiles = ["pages/404.mdx"] }: { docsRootPath: string; ignoredFiles: string[] }): Promise<MarkdownSourceType[]> {
@@ -202,9 +206,12 @@ async function generateEmbeddings({ databaseUrl, openaiApiKey, docsRootPath, sho
 async function run(): Promise<void> {
 	try {
 		// >> Get the inputs
-		const databaseUrl: string | undefined = core.getInput("database-url")
-		const openaiApiKey: string | undefined = core.getInput("openai-api-key")
-		const docsRootPath: string = core.getInput("docs-root-path") || "docs/"
+        const databaseUrl = core.getInput("database-url") || process.env.DATABASE_URL
+        const openaiApiKey = core.getInput("openai-api-key") || process.env.OPENAI_API_KEY
+        const docsRootPath = core.getInput("docs-root-path") || "docs/"
+
+        console.log("Database URL:", databaseUrl)
+        console.log("OpenAI API Key:", openaiApiKey)
 
 		// > Determine the state of the shouldRefresh flag
 		const shouldRefresh: boolean = false
