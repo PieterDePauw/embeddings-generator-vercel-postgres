@@ -1,0 +1,30 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+	"code_actions_on_format": {
+		"source.fixAll.biome": true,
+		"source.organizeImports.biome": true
+	},
+	"on": {
+		"biome": {
+			"editor.formatOnSave": true,
+			"editor.formatOnType": true,
+			"editor.formatOnPaste": true
+		}
+	},
+	"linked_edits": true,
+	"auto_update": true,
+	"load_direnv": "direct",
+	"direct": {
+		"language_servers": ["biome"]
+	},
+	"confirm_quit": true,
+	"edit_predictions": {
+		"enabled": true,
+		"mode": "eager"
+	}
+	// "fixAll": { "biome": true }
+	// "language_servers": ["biome"]
+}
