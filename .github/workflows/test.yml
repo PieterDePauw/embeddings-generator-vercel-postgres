@@ -11,14 +11,23 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-            - run: |
-                  npm install
-            - run: |
-                  npm run all
+            - run: npm install
+            - run: npm run all
+            - name: Save dist directory
+              uses: actions/upload-artifact@v3
+              with:
+                  name: dist
+                  path: dist/
+
     test: # make sure the action works on a clean machine without building
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+            - name: Download dist directory
+              uses: actions/download-artifact@v3
+              with:
+                  name: dist
+            - run: ls dist # optional: verify dist directory contents
             - uses: ./
               with:
                   database-url: ${{ secrets.DATABASE_URL }}
